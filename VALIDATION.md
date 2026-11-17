@@ -120,3 +120,6 @@ v84 used 15 segments per pass for farmland and 8 for built-up land, and bootstra
 Step 3 aligned to 10 for built-up land: Waikato mineral-soil farmland relative to built-up land +2.9 ± 1.9 (100 passes); built-up absolute −1.9.
 
 ## Step 9 — outputs: Table3/Table4.xlsx, paper_values.json, plot workbooks, GeoTIFF/GeoPackage maps, waikato_is2.qgz (checked by rendering).
+
+## Decision (user, 17 Nov 2026): tied repeat LiDAR = median over 16 placements of the 5 km grid
+Default placement alone lay near the fast end of the spread (independent check of v83). Medians: Organic-Soil farmland −18.5 (placements −20.5 to −16.0), mineral +0.9, Hauraki Plains mineral +0.9, Kopuatai bog −12.1 (default placement −19.0, +1.1, +1.1, −10.7). Draft v86.

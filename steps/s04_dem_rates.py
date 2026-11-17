@@ -75,7 +75,7 @@ def repeat_lidar(cfg):
         R["same campaign"][nm] = dict(campaign=cp, dh_cm=round(float(np.median(dh[tm]) - np.median(dh[rm])) * 100, 1), interval_yr=round(float(np.median(dt[tm])), 1),
                                       rate=round(float(np.median(rate[tm]) - np.median(rate[rm])), 1), target_cells=int(tm.sum()), reference_cells=int(rm.sum()))
     R["mineral-soil farmland, untied"] = {cp: round(float(np.median(rate[MIN & c])), 1) for cp, c in CAP.items()}
-    # (3) tie to ICESat-2 on a square grid
+    # (3) tie to ICESat-2 on a square grid; class rates are medians over 16 grid placements
     TIE = json.load(open(f"{out}/tables/icesat2_rates.json"))["absolute"]["mineral-soil farmland"]["rate"]
     npk = (fa > rl["farm_fraction_min"]) & ~near & np.isfinite(rate)
     YY, XX = np.mgrid[0:sh[0], 0:sh[1]]; X = tf.c + (XX + .5) * 96; Y = tf.f - (YY + .5) * 96
@@ -93,7 +93,7 @@ def repeat_lidar(cfg):
         r_ = ((tf.f - d.Y.values) // 96).astype(int); c_ = ((d.X.values - tf.c) // 96).astype(int); ok_ = (r_ >= 0) & (r_ < sh[0]) & (c_ >= 0) & (c_ < sh[1])
         v = np.full(len(d), np.nan); v[ok_] = t[r_[ok_], c_[ok_]]; v = v[np.isfinite(v)]; return round(float(np.median(v)), 1), int(v.size)
     ox, oy = cfg["grids"]["square_origin"]; t5, nsq = tie(cfg["grids"]["tie_square_m"], ox, oy)
-    R["tie"] = dict(ICESat2_mineral_rate=TIE, squares_with_own_offset=nsq, classes={k: dict(zip(("median", "points"), samp(t5, d))) for k, d in CL.items()}, spread={})
+    R["tie"] = dict(ICESat2_mineral_rate=TIE, squares_with_own_offset=nsq, default_placement={k: dict(zip(("median", "points"), samp(t5, d))) for k, d in CL.items()}, spread={})
     for G in (5000, 10000):
         v = {k: [] for k in CL}
         for dx in np.arange(0, G, G / 4):
@@ -101,6 +101,8 @@ def repeat_lidar(cfg):
                 t, _ = tie(G, ox + dx, oy + dy)
                 for k, d in CL.items(): v[k].append(samp(t, d)[0])
         R["tie"]["spread"][f"{G // 1000} km"] = {k: dict(min=min(x), median=float(np.median(x)), max=max(x)) for k, x in v.items()}
+    # tied class rates = median over the 16 placements of the 5 km grid (the default placement alone lies near the fast end of the spread)
+    R["tie"]["classes"] = {k: dict(median=round(v["median"], 1), points=R["tie"]["default_placement"][k]["points"]) for k, v in R["tie"]["spread"][f"{cfg['grids']['tie_square_m'] // 1000} km"].items()}
     write(f"{work}/repeat/repeat_tied_96m.tif", t5.astype(np.float32), tf, 96.0)
     # (2) map: 96 m rates on the 30 m grid (nearest), each farmland cell referenced locally, 240 m grid (Figure 3b)
     from lib.maps import rel, blocks240
