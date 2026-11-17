@@ -96,3 +96,6 @@ zones ≤ −10/−20/−30/−40/−50/−60: 636.5 / 331.9 / 202.3 / 119.1 / 6
 - InSAR zones (unmasked pipeline map; areas in km²): ≤ −40 mm/yr 119.1 km² (v84 114.5); 2018–2026 rates within 2 mm/yr at ≤ −25 and stricter;
   at loose thresholds the InSAR-period rate moves more: ≤ −10 −22.4 ± 4.2 (v84 −15.1 ± 3.8), ≤ −20 −28.6 ± 4.9 (v84 −31.9 ± 4.8).
   Sensitivity run with the masked pipeline map: tests/zones_masked.py (pending).
+- Masked-map sensitivity (tests/zones_masked.py): masked vs unmasked pipeline zones agree within about 2 mm/yr (largest: ≤ −60, InSAR period, −53.0 vs −47.1, 0.6 SE).
+  The larger differences from v84 (e.g. ≤ −10, InSAR period: v84 −15.1, masked pipeline −20.7; ≤ −40: −58.8 vs −51.9) come from the v84 zone map,
+  `Waikato_InSAR_rate_rel_local_pasture_240m.tif`, an older map version that differs cell by cell from the stated chain (5th/95th percentile ±6 mm/yr), not from the mask.
