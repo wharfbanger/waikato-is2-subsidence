@@ -22,6 +22,27 @@ def lidar_copernicus(cfg, offset_2021_m=0.0):
     return np.where(np.isfinite(C24), C24, C21).astype(np.float32), np.where(np.isfinite(C24), 2, np.where(np.isfinite(C21), 1, 0)).astype(np.int8), tf
 
 
+def areas(cfg, cop_shape, tf):
+    """S-map Organic Soils in the study rectangle; Table 1 overlaps: LINZ tile footprints of each survey on land in the study rectangle (land: WorldCover not water)."""
+    import geopandas as gpd, pyproj
+    from shapely.geometry import box
+    from rasterio.features import geometry_mask
+    from rasterio.warp import reproject, Resampling
+    raw = cfg["paths"]["raw"]; a = cfg["study_area"]; rect = box(a["xmin"], a["ymin"], a["xmax"], a["ymax"])
+    org = gpd.read_file(f"{raw}/soils/smap_organic_waikato.shp").to_crs(2193).unary_union
+    TI = json.load(open(f"{raw}/tile_index.json")); tr = pyproj.Transformer.from_crs(4326, 2193, always_xy=True)
+    def foot(col):
+        from shapely.ops import transform, unary_union
+        return unary_union([transform(tr.transform, box(*b)) for n, b, *_ in TI[col]["tiles"]]).intersection(rect)
+    with rasterio.open(f"{raw}/worldcover/ESA_WorldCover_10m_2021_v200_S39E174_Map.tif") as w:
+        win = rasterio.windows.from_bounds(174.6, -38.2, 175.9, -36.95, w.transform).round_offsets().round_lengths(); s_ = w.read(1, window=win); wt = w.window_transform(win)
+    land = np.zeros(cop_shape, np.float32); reproject(((s_ != 80) & (s_ != 0)).astype(np.float32), land, src_transform=wt, src_crs="EPSG:4326", dst_transform=tf, dst_crs="EPSG:2193", resampling=Resampling.average)
+    f24, f21 = foot("waikato_2024"), foot("waikato_2021")
+    km2 = lambda g: round(float((land * ~geometry_mask([g], cop_shape, tf)).sum() * 0.0009), 0) if not g.is_empty else 0.0
+    return {"land in the study rectangle (km2)": round(float(land.sum() * 0.0009), 0), "S-map Organic Soils in the study rectangle (km2)": round(org.intersection(rect).area / 1e6, 0),
+            "Copernicus -> 2024 overlap (km2)": km2(f24), "Copernicus -> 2021 overlap, outside 2024 (km2)": km2(f21.difference(f24))}
+
+
 def run(cfg):
     W, out = f"{cfg['paths']['work']}/grid30", cfg["paths"]["out"]; os.makedirs(f"{out}/maps", exist_ok=True); os.makedirs(f"{out}/tables", exist_ok=True)
     m = cfg["masks"]; slope, _ = read(f"{W}/slope_deg.tif"); grass, _ = read(f"{W}/grassfrac.tif"); farmf, _ = read(f"{W}/farmfrac.tif")
@@ -43,9 +64,10 @@ def run(cfg):
     from rasterio.warp import reproject, Resampling
     C, _, tf = lidar_copernicus(cfg); ref = ref_adapt(C, NONPF, cfg); ok = np.isfinite(C) & (np.abs(C) < cap) & np.isfinite(ref) & org
     with rasterio.open(f"{cfg['paths']['raw']}/worldcover/ESA_WorldCover_10m_2021_v200_S39E174_Map.tif") as w:
-        win = rasterio.windows.from_bounds(174.85, -38.2, 175.8, -36.95, w.transform).round_offsets().round_lengths(); s_ = w.read(1, window=win); wt = w.window_transform(win)
+        win = rasterio.windows.from_bounds(174.6, -38.2, 175.9, -36.95, w.transform).round_offsets().round_lengths(); s_ = w.read(1, window=win); wt = w.window_transform(win)
     crop = np.zeros(C.shape, np.float32); reproject((s_ == 40).astype(np.float32), crop, src_transform=wt, src_crs="EPSG:4326", dst_transform=tf, dst_crs="EPSG:2193", resampling=Resampling.average)
     R["Organic-Soil farmland by land cover"] = {k: round(float(np.median((C - ref)[ok & m])), 1) for k, m in (("grassland", PAST), ("cropland", (crop >= 0.5) & FARM))}
+    R["areas"] = areas(cfg, cop_shape=C.shape, tf=tf)
     json.dump(R, open(f"{out}/tables/lidcop.json", "w"), indent=1)
 
 

@@ -62,7 +62,7 @@ def copernicus(cfg, out):
 def masks(cfg, W):
     raw = cfg["paths"]["raw"]; tf, sh = grid(cfg); m = cfg["masks"]
     with rasterio.open(f"{raw}/worldcover/ESA_WorldCover_10m_2021_v200_S39E174_Map.tif") as w:
-        win = rasterio.windows.from_bounds(174.85, -38.2, 175.8, -36.95, w.transform).round_offsets().round_lengths(); s_ = w.read(1, window=win); wt = w.window_transform(win)
+        win = rasterio.windows.from_bounds(174.6, -38.2, 175.9, -36.95, w.transform).round_offsets().round_lengths(); s_ = w.read(1, window=win); wt = w.window_transform(win)
     for name, cls in (("farmfrac", m["worldcover_farmland"]), ("grassfrac", [30]), ("wetfrac", [90]), ("builtfrac", [m["worldcover_builtup"]])):
         a = np.zeros(sh, np.float32)
         reproject(np.isin(s_, cls).astype(np.float32), a, src_transform=wt, src_crs="EPSG:4326", dst_transform=tf, dst_crs="EPSG:2193", resampling=Resampling.average)

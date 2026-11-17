@@ -18,6 +18,8 @@ def is2rate(cfg, name, extra, out_dir):
              exclude=os.path.abspath(f"{raw}/soils/smap_organic_waikato.shp").replace("\\", "/"), exclude_buffer_m=cfg["masks"]["buffer_m"],
              segments_file=os.path.abspath(f"{raw}/icesat2").replace("\\", "/") + "/Waikato_??_atl06sr.parquet", out_dir=os.path.abspath(out_dir).replace("\\", "/"), name=name)
     P.update(extra); pf = f"{out_dir}/{name}_params.txt"; txt = "\n".join(f"{k} = {v}" for k, v in P.items()) + "\n"
+    import hashlib
+    if "target_area" in P: txt += "# target_md5 = " + hashlib.md5(open(P["target_area"], "rb").read()).hexdigest() + "\n"   # rerun when the polygon changes
     done = os.path.exists(f"{out_dir}/{name}_target.json") or os.path.exists(f"{out_dir}/{name}_hexagons.gpkg")
     if done and os.path.exists(pf) and open(pf).read() == txt and not cfg.get("force_is2rate"): return out_dir   # same parameters, already run
     open(pf, "w").write(txt)
@@ -71,7 +73,7 @@ def max_rates(cfg):
     P = {"Oct 2018 - Jun 2022": ("2018-10-13", "2022-06-30"), "Jul 2022 - Oct 2026": ("2022-07-01", "2026-10-20"), "2018-2026": ("2018-10-13", "2026-10-20")}
     R = {}
     for nm, g in T.items():
-        gpd.GeoDataFrame(geometry=[g], crs=2193).to_file(f"{D}/polys/{nm}.gpkg"); R[nm] = {"km2": round(g.area / 1e6, 1)}
+        gpd.GeoDataFrame(geometry=[g], crs=2193).to_file(f"{D}/polys/{nm}.gpkg"); R[nm] = {"km2": round(g.area / 1e6, 1), "km2_in_study_rectangle": round(g.intersection(study.geometry.iloc[0]).area / 1e6, 1)}
         for pk, (t0, t1) in P.items():
             tag = f"{nm}_{t0[:4]}_{t1[:4]}"
             is2rate(cfg, tag, dict(start=t0, end=t1, seasonal="yes", target_classes="30, 40", ref_classes="30, 40", reference="local",
@@ -87,6 +89,7 @@ def max_rates(cfg):
         if nm.startswith("band"):
             mk = ~geometry_mask([g], C.shape, tf30); R[nm]["LiDAR - Copernicus median"] = round(float(np.median(relc[mk & ok])), 1)
         else: R[nm]["InSAR map median"] = round(float(np.nanmedian(I[np.isfinite(I) & (I <= -int(nm.split('_')[-1]))])), 1)
+    R["Organic Soils more than 3 km inside (km2 in study rectangle)"] = round(org.buffer(-3000).intersection(study.geometry.iloc[0]).area / 1e6, 1)
     json.dump(R, open(f"{out}/tables/max_rates.json", "w"), indent=1)
 
 

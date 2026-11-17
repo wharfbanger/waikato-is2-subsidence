@@ -2,7 +2,7 @@
 Input: data/work/segments.parquet (step 2). Outputs: data/work/segments_classified.parquet, outputs/tables/icesat2_rates.json and
 icesat2_rates.xlsx, outputs/plots/fig6_series.xlsx, data/work/bias2021_10km.csv."""
 import json, os, numpy as np, pandas as pd, geopandas as gpd
-from lib.is2 import per_pass, fit, diff_series, design, segmented, amplitude
+from lib.is2 import per_pass, fit, diff_series, design, segmented, amplitude, separate_difference
 
 FARM, BUILT, WET = (30, 40), 50, 90
 
@@ -62,6 +62,16 @@ def run(cfg):
     R["periods"] = {k: {"Oct 2018 - Jun 2022": fit(v[(v.t >= u0) & (v.t < u1)], n_boot=nb), "Jul 2022 - Oct 2026": fit(v[(v.t >= v0) & (v.t < v1)], n_boot=nb)} for k, v in S.items()}
     R["segmented"] = {k: segmented(v, rc["break_date"], n_boot=nb) for k, v in S.items()}
     R["seasonal amplitude"] = {k: amplitude(A[k], rc["n_boot_amplitude"]) for k in ("Organic-Soil farmland", "mineral-soil farmland")}
+    R["separate fits, before minus after"] = {k: separate_difference(v, rc["break_date"], n_boot=nb) for k, v in S.items()}
+    LOC3 = MIN[gpd.GeoSeries(gpd.points_from_xy(MIN.X, MIN.Y), crs=2193).within(kp.buffer(3000)).values]
+    R["Kopuatai bog, reference within 3 km"] = fit(diff_series(BOG, LOC3, ms), n_boot=0)
+    R["Organic-Soil farmland without annual cycle"] = fit(S["Organic-Soil farmland"], n_boot=0, seasonal=False)
+    rat = {o: fit(diff_series(F[F.order == o], MIN, ms), n_boot=nb) for o in F.order.unique() if o != "not mapped" and (F.order == o).sum() >= 300}
+    rat["Kopuatai bog"] = R["relative to mineral-soil farmland"]["Kopuatai bog"]
+    rr = {k: round(v["se"] / v["boot_se"], 2) for k, v in rat.items() if v}
+    R["SE ratio formula/bootstrap (soil orders and bog, 2018-2026)"] = dict(ratios=rr, median=round(float(np.median(list(rr.values()))), 2), min=min(rr.values()), max=max(rr.values()))
+    seg = pd.read_parquet(f"{work}/segments.parquet", columns=["X", "Y"])
+    R["segments after screening in the study area"] = int((seg.X.between(a["xmin"], a["xmax"], inclusive="left") & seg.Y.between(a["ymin"], a["ymax"], inclusive="left")).sum())
     R["survey bias"] = survey_bias(cfg, pd.read_parquet(f"{work}/segments.parquet"))
     json.dump(R, open(f"{out}/tables/icesat2_rates.json", "w"), indent=1)
     with pd.ExcelWriter(f"{out}/plots/fig6_series.xlsx") as xw:

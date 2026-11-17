@@ -28,6 +28,7 @@ def run(cfg):
                       columns=["Land class", "ICESat-2", "InSAR", "LiDAR − Copernicus", "Repeat LiDAR, tied"])
     rows = []
     for k, v in MX.items():
+        if not isinstance(v, dict) or "km2" not in v: continue
         f_ = lambda d: f"{d['rate']:+.1f} ± {d['se']:.1f} ({d['passes']})".replace("-", "−") if d and d.get("rate") is not None else "–"
         rows.append([("Distance inside Organic Soils (m)" if k.startswith("band") else "Farmland zoned by InSAR (mm/yr)"), k.split("_", 1)[1].replace("_", "–").replace("le–", "≤ −"),
                      v["km2"], f_(v["Oct 2018 - Jun 2022"]), f_(v["Jul 2022 - Oct 2026"]), f_(v["2018-2026"]), v.get("InSAR map median", "–"), v.get("LiDAR - Copernicus median", "–")])
@@ -35,6 +36,7 @@ def run(cfg):
     with pd.ExcelWriter(f"{out}/tables/Table3.xlsx") as xw: T3.to_excel(xw, index=False)
     with pd.ExcelWriter(f"{out}/tables/Table4.xlsx") as xw: T4.to_excel(xw, index=False)
     V = {"icesat2": I3, "lidar_copernicus": LC, "repeat_lidar": RL, "insar": IN, "hexagons": HX, "max_rates": MX, "weather": WE, "south_island": SI, "repeat_vs_insar": RV, "sensitivity": SE}
+    if os.path.exists(f"{out}/tables/max_rates_zones_masked.json"): V["max_rates_zones_masked"] = J(out, "max_rates_zones_masked.json")   # tests/zones_masked.py
     json.dump(V, open(f"{out}/tables/paper_values.json", "w"), indent=1)
     hx = gpd.read_file(f"{out}/maps/hex_3km.gpkg")
     with pd.ExcelWriter(f"{out}/plots/fig4d_hexagons.xlsx") as xw: pd.DataFrame(hx.drop(columns="geometry")).to_excel(xw, index=False)

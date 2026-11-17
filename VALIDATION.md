@@ -135,3 +135,15 @@ Fifth independent check: Section 3.4 (farmland) and Table S1 (grassland) disagre
 - Block bootstrap: the pipeline counted 10 km squares from round 10 km lines, Table S1 from the study-area corner (5,785,000 N). Fixed to the corner: 42 squares (as the check), CI widens from about 7 to 10 mm/yr; also the bias grid. The CI depends on square placement (5.6–9.6 mm/yr wide for 5 km shifts).
 - Survey bias: the absolute 2021 bias depends on the statistic (segment median +5.0 cm; median over passes +2.1; mean over passes +0.6). Correcting or not changes LiDAR − Copernicus by 0.1 (−17.2 uncorrected, −17.1 with the 4.2 cm same-pass offset, −17.3 with the old grid). Decision (user): no survey-bias correction; Section 3.3 removed, one sentence in the LiDAR − Copernicus paragraph; offsets reported as farmland minus built-up on the same passes (4.2 / 0.8 cm).
 - LiDAR − Copernicus (v89): −17.2 (95% CI −21.9 to −12.1), unreferenced mineral reference +20.0; hexagons r = 0.64 / 0.58 (472).
+
+## Every number from the pipeline (draft v90, 17 Nov 2026)
+Ported into the pipeline (previously read from pre-pipeline files or written in the text): period rates, segmented fits and the separate-fit difference CI;
+seasonal amplitudes; bog and local mineral values; weather periods and water years; ERA5 periods; segment count (2.2 million); S-map Organic area (770 km²);
+land area of the study rectangle (8,868 km²); Table 1 overlaps (2,725 / 6,003 km²; v84 2,681 / 6,046; check 2,693 / 5,971); band areas in the study rectangle;
+LiCSBAS network (505 interferograms, 118 acquisitions); annual-cycle omission (1.0 mm/yr); SE ratios; mask sensitivity (7% of Organic-Soil farmland cells; 1.0 mm/yr; zones 1–5% smaller; zone rates up to 2.7 mm/yr).
+Corrected in the paper: 3 km bog limit changes the rate by 0.6 (was "< 0.1"; check 0.7); SE ratio median 0.96, range 0.79–1.02 (was 1.00, 0.81–1.00; check 0.98, 0.82–1.08).
+Bugs fixed: WorldCover window for the 30 m masks began at 174.85° E, missing a 1,342 km² western strip of the study rectangle (1.5 km² of Organic Soils); hexagons 472 -> 486.
+is2rate runs are now reused only when the target polygon is unchanged (md5 in the parameter file).
+Differences from the sixth check explained: survey offsets (median vs mean over passes, and scatter between passes); InSAR class values (now medians of 30 m cells, as LiDAR − Copernicus: −20.3 vs check −20.5);
+bog passes (reference within 5 km of the Kopuatai body vs of the bog); Hauraki quarters (240 m cells entirely > 500 m from Organic Soils vs mostly mineral). Hexagons 486 vs 477: edge rules, not pursued.
+A provenance scan of v90 finds no number without a pipeline or config source other than the study-area coordinates and instrument facts.

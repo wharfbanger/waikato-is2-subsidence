@@ -17,7 +17,7 @@ def wsl_path(p): p = os.path.abspath(p).replace("\\", "/"); return f"/mnt/{p[0].
 def licsbas(cfg, D):
     """Writes and runs a WSL script; returns the folder holding results/ of the pipeline's step-15 run."""
     i = cfg["insar"]; s15 = i["step15"]; T = f"{i['wsl_pipeline_dir']}/TS"
-    step15 = "" if not i["mask"] else f"""mkdir -p {T}; [ -f {T}/cum.h5 ] || cp $J/TS_GEOCml1clip/cum.h5 {T}/
+    step15 = f"""mkdir -p {T}; [ -f {T}/cum.h5 ] || cp $J/TS_GEOCml1clip/cum.h5 {T}/
 rm -rf {T}/results {T}/info {T}/network; cp -r $J/TS_GEOCml1clip/results $J/TS_GEOCml1clip/info $J/TS_GEOCml1clip/network {T}/
 cd {i['wsl_pipeline_dir']}
 LiCSBAS15_mask_ts.py -t TS -c {s15['coh_thre']} -u {s15['n_unw_r_thre']} -v {s15['vstd_thre']} -T {s15['maxTlen_thre']} -g {s15['n_gap_thre']} -s {s15['stc_thre']} -i {s15['n_ifg_noloop_thre']} -l {s15['n_loop_err_thre']} -r {s15['resid_rms_thre']} | sed -n '/Noise index/,/Kept/p'
@@ -35,6 +35,7 @@ if [ ! -f $J/TS_GEOCml1clip/cum.h5 ]; then
   ./batch_LiCSBAS.sh
 fi
 {step15}
+echo "interferograms_input $(grep -c '^2' $J/TS_GEOCml1clip/info/11ifg_stats.txt)"; echo "acquisitions_input $(grep '^2' $J/TS_GEOCml1clip/info/11ifg_stats.txt | awk '{{print $1}}' | tr _ '\n' | sort -u | wc -l)"
 cp $J/TS_GEOCml1clip/results/vel {wsl_path(D)}/; cp $J/GEOCml1clip/U.geo $J/GEOCml1clip/EQA.dem_par {wsl_path(D)}/
 """
     p = f"{D}/run_licsbas.sh"; open(p, "w", newline="\n").write(sh)
@@ -49,7 +50,7 @@ def run(cfg):
     par = dict(l.split(":")[0:2] for l in open(f"{D}/EQA.dem_par") if ":" in l); w, h = int(par["width"]), int(par["nlines"])
     lat0, lon0, dlat, dlon = (float(par[k].split()[0]) for k in ("corner_lat", "corner_lon", "post_lat", "post_lon"))
     rd = lambda f: np.fromfile(f"{D}/{f}", dtype=np.float32).reshape(h, w)
-    vel, U = rd("vel"), rd("U.geo"); keep = (rd("mask") > 0) if cfg["insar"]["mask"] else np.ones(vel.shape, bool)   # no mask by default (reproducibility)
+    vel, U, msk = rd("vel"), rd("U.geo"), rd("mask") > 0; keep = msk if cfg["insar"]["mask"] else np.ones(vel.shape, bool)   # no mask by default (reproducibility)
     vup = np.where(keep, vel / U, np.nan).astype(np.float32); vup[~np.isfinite(vup)] = np.nan
     tf4326 = from_origin(lon0 - dlon / 2, lat0 - dlat / 2, dlon, -dlat)   # EQA corner is a pixel centre
     with rasterio.open(f"{D}/vel_up.tif", "w", driver="GTiff", height=h, width=w, count=1, dtype="float32", crs="EPSG:4326", transform=tf4326, nodata=np.nan) as o: o.write(vup, 1)
@@ -67,7 +68,13 @@ def run(cfg):
     def samp(arr, d, res):
         r_ = ((tf.f - d.Y.values) // res).astype(int); c_ = ((d.X.values - tf.c) // res).astype(int); ok = (r_ >= 0) & (r_ < arr.shape[0]) & (c_ >= 0) & (c_ < arr.shape[1])
         v = np.full(len(d), np.nan); v[ok] = arr[r_[ok], c_[ok]]; return round(float(np.nanmedian(v)), 1)
-    R = {"step 15": log.strip(), "classes (240 m map at segment locations)": {k: samp(M, d, 240.0) for k, d in CL.items()},
+    YY, XX = np.mgrid[0:g.shape[0], 0:g.shape[1]]; Xc = tf.c + (XX + .5) * 30; Yc = tf.f - (YY + .5) * 30; HBX = (Xc >= hx0) & (Xc < hx1) & (Yc >= hy0) & (Yc < hy1)
+    org = read(f"{W}/organic.tif")[0].astype(bool)
+    C30 = {"Organic-Soil farmland": FARM & org, "mineral-soil farmland": FARM & ~near, "Hauraki Plains mineral-soil farmland": FARM & ~near & HBX}
+    import re as _re
+    cnt = {k: int(v) for k, v in _re.findall(r"^(interferograms_input|acquisitions_input) (\d+)", log, _re.M)}
+    R = {"LiCSBAS network": cnt, "step 15": log.strip(), "classes (median of 30 m farmland cells)": {k: round(float(np.nanmedian(relv[m])), 1) for k, m in C30.items()},
+         "classes (240 m map at segment locations)": {k: samp(M, d, 240.0) for k, d in CL.items()},
          "zones_km2": {t: round(float((M <= t).sum() * 0.0576), 1) for t in cfg["insar"]["zones_mm_yr"]}}
     import geopandas as gpd
     from rasterio.features import geometry_mask
@@ -80,5 +87,12 @@ def run(cfg):
     cx, cy = pyproj.Transformer.from_crs(4326, 2193, always_xy=True).transform(lo, la)
     cam = S[(S.land == "built-up") & (np.hypot(S.X - cx, S.Y - cy) <= cfg["insar"]["cambridge_radius_km"] * 1000)]
     R["mineral-soil farmland relative to Cambridge built-up land"] = round(samp(g, MIN, 30.0) - samp(g, cam, 30.0), 1); R["Cambridge built-up segments"] = int(len(cam))
+    # mask sensitivity (Section 5.3): the step-15 mask of Harvey et al. (2026) thresholds, applied to the same velocity
+    vm = np.where(msk, vel / U, np.nan).astype(np.float32); gm = np.full(cop.shape, np.nan, np.float32)
+    reproject(vm, gm, src_transform=tf4326, src_crs="EPSG:4326", dst_transform=tf, dst_crs="EPSG:2193", resampling=Resampling.average, src_nodata=np.nan, dst_nodata=np.nan)
+    relm, _ = rel(gm, FARM, FARM & ~near, cfg); Mm = blocks240(relm, cfg); of = FARM & org & np.isfinite(g)
+    R["mask sensitivity"] = dict(Organic_farmland_cells_removed_pct=round(100 * float((of & ~np.isfinite(gm)).sum() / of.sum()), 1),
+        Organic_change=round(float(np.nanmedian(relm[FARM & org]) - np.nanmedian(relv[FARM & org])), 1),
+        zone_area_change_pct={t: round(100 * float(((Mm <= t).sum() / max((M <= t).sum(), 1)) - 1), 1) for t in cfg["insar"]["zones_mm_yr"]})
     farm_area = FARM & np.isfinite(g); R["masked share of study area (%)"] = round(100 * float(1 - np.isfinite(g[np.isfinite(cop)]).mean()), 1)
     json.dump(R, open(f"{out}/tables/insar.json", "w"), indent=1); print(json.dumps(R, indent=1), flush=True)

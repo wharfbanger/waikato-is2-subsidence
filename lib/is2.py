@@ -10,10 +10,10 @@ from scipy.stats import t as tdist
 T0 = 2021.5   # time origin of the trend term (does not change the rate)
 
 
-def design(pp, t_break=None):
+def design(pp, t_break=None, seasonal=True):
     """Columns: one constant per DEM, trend, sin, cos [, slope change after t_break, step at t_break]. Returns (A, index of the trend column)."""
     G = pd.get_dummies(pp["col"]).astype(float).values; t = pp["t"].values
-    cols = [G, t - T0, np.sin(2 * np.pi * t), np.cos(2 * np.pi * t)]
+    cols = [G, t - T0] + ([np.sin(2 * np.pi * t), np.cos(2 * np.pi * t)] if seasonal else [])
     if t_break is not None:
         after = (t >= t_break).astype(float); cols += [after * (t - t_break), after]
     return np.column_stack(cols), G.shape[1]
@@ -25,10 +25,10 @@ def per_pass(d, min_seg):
     return pp[pp.n >= min_seg]
 
 
-def fit(pp, min_passes=8, n_boot=2000, seed=0):
+def fit(pp, min_passes=8, n_boot=2000, seed=0, seasonal=True):
     """Trend (mm/yr) of per-pass values pp (columns pass, col, t, r in m). None if fewer than min_passes passes."""
     if len(pp) < min_passes or pp["pass"].nunique() < min_passes: return None
-    A, k = design(pp); y = pp["r"].values
+    A, k = design(pp, seasonal=seasonal); y = pp["r"].values
     b, *_ = np.linalg.lstsq(A, y, rcond=None); e = y - A @ b
     npass = int(pp["pass"].nunique()); dof = npass - A.shape[1]
     if dof < 1: return None
@@ -38,7 +38,7 @@ def fit(pp, min_passes=8, n_boot=2000, seed=0):
     if n_boot:
         passes = pp["pass"].unique(); rng = np.random.default_rng(seed); grp = {p: np.flatnonzero(pp["pass"].values == p) for p in passes}; bs = []
         for _ in range(n_boot):
-            i = np.concatenate([grp[p] for p in rng.choice(passes, len(passes))]); Ai, _ = design(pp.iloc[i])
+            i = np.concatenate([grp[p] for p in rng.choice(passes, len(passes))]); Ai, _ = design(pp.iloc[i], seasonal=seasonal)
             if Ai.shape[1] != A.shape[1]: continue
             bs.append(np.linalg.lstsq(Ai, y[i], rcond=None)[0][k])
         bs = np.array(bs) * 1000
@@ -86,3 +86,17 @@ def amplitude(pp, n_boot=500, seed=3):
         p = pp.iloc[np.concatenate([grp[x] for x in rng.choice(passes, len(passes))])]
         if design(p)[0].shape[1] == ncol: bs.append(amp(p))
     return dict(amplitude_mm=round(a, 1), ci=[round(float(np.percentile(bs, 2.5)), 1), round(float(np.percentile(bs, 97.5)), 1)])
+
+
+def separate_difference(pp, t_break, n_boot=2000, seed=5):
+    """Rate before minus rate after t_break, each period fitted separately (own DEM constants and annual cycle); 95% CI from a bootstrap of whole passes."""
+    def one(p):
+        a, b = p[p.t < t_break], p[p.t >= t_break]
+        ra = np.linalg.lstsq(*(lambda A, k: (A, a["r"].values))(*design(a)), rcond=None)[0][design(a)[1]]
+        rb = np.linalg.lstsq(*(lambda A, k: (A, b["r"].values))(*design(b)), rcond=None)[0][design(b)[1]]
+        return (ra - rb) * 1000
+    d0 = one(pp); passes = pp["pass"].unique(); rng = np.random.default_rng(seed); grp = {p: np.flatnonzero(pp["pass"].values == p) for p in passes}; bs = []
+    for _ in range(n_boot):
+        p = pp.iloc[np.concatenate([grp[x] for x in rng.choice(passes, len(passes))])]
+        if (p.t < t_break).sum() > 5 and (p.t >= t_break).sum() > 5: bs.append(one(p))
+    return dict(before_minus_after=round(float(d0), 1), CI=[round(float(np.percentile(bs, 2.5)), 1), round(float(np.percentile(bs, 97.5)), 1)])
