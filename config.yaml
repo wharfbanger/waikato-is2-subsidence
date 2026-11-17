@@ -102,7 +102,11 @@ insar:
   clip: [174.716, 175.940, -38.237, -37.094]
   step11: {unw_thre: 0.3, coh_thre: 0.05}
   step12: {loop_thre: 1.5, multi_prime: true}
-  step15: {coh_thre: 0.05, n_unw_r_thre: 141, vstd_thre: 2, maxTlen_thre: 1, n_gap_thre: 30, stc_thre: 5, n_ifg_noloop_thre: 50, n_loop_err_thre: 100, resid_rms_thre: 10}
+  step15: {coh_thre: 0.05, n_unw_r_thre: 1.195, vstd_thre: 2, maxTlen_thre: 1, n_gap_thre: 30, stc_thre: 5, n_ifg_noloop_thre: 50, n_loop_err_thre: 100, resid_rms_thre: 10}   # Harvey et al. (2026) Figure S1; n_unw_r 1.195 x 118 images = 141 (the 14 Jan 2025 new_params map)
+  wsl_job_dir: /home/wharfbanger/LiCSBAS_Jobs/TVZ/073D_12785_121717_2018_22
+  wsl_pipeline_dir: /home/wharfbanger/waikato_pipeline/insar
+  conda_env: licsbas
+  licsbas_home: /home/wharfbanger/LiCSBAS2
   zones_mm_yr: [-5, -10, -15, -20, -25, -30, -35, -40, -45, -50, -55, -60]   # as results_v55/prep_maxrate.py
   cambridge_radius_km: 3
 

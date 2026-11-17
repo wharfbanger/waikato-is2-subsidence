@@ -69,3 +69,13 @@ The paper takes the pipeline's mineral-soil values (study rectangle, S-map soil 
 | Tied, Kopuatai bog | −10.3 | −10.7 |
 | Grid-placement spread, Organic: 5 km / 10 km | −20.0 to −16.5 / −22.1 to −14.3 | −20.5 to −16.0 / −21.6 to −15.3 |
 All within 0.5 mm/yr; differences from the 16 m grid offset and the tie value (+1.2 instead of +1.4).
+
+## Step 5 — InSAR (17 Nov 2026)
+- LiCSBAS step 15 rerun on a copy of the 14 Jan 2025 time series with the Methods thresholds (fewer than 141 unwrapped ifgs, vstd > 2 mm/yr, n_gap 30, n_loop_err 100, resid_rms 10, others default) keeps 1,157,797 pixels, exactly the published new_params mask. (The job log's step-15 run used LiCSBAS defaults for n_unw and vstd; that was an earlier run, not the map used. The Methods text is correct.)
+- The pipeline's map-referencing gives cell-for-cell the same result as the v84 code on the same 30 m grid.
+| Quantity | v84 | Pipeline |
+|---|---|---|
+| InSAR zones ≤ −40 / −50 / −60 (km²) | 114.6 / 64.0 / 36.6 | 114.6 / 64.0 / 36.6 |
+| Organic-Soil farmland (240 m map at segment locations) | −20.1 | see insar.json (soil-order classes; v84 used the peat shapefile and Nth_Waikato polygon) |
+- Mask sensitivity on the pipeline chain: no mask gives Organic −20.6 (masked −20.5) and zones 1–4% larger (−10 to −60 mm/yr); LiCSBAS default n_unw/vstd thresholds give zones 2–20% smaller.
+- Kopuatai bog InSAR: pipeline −10.5 (240 m farmland map at bog segments) vs v84 −26.0 (peat_bodies.py: wetland cells referenced to mineral farmland); definition to be ported in step 6.
