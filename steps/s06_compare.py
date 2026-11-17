@@ -89,3 +89,20 @@ def max_rates(cfg):
 _run_hex = run
 def run(cfg):
     _run_hex(cfg); max_rates(cfg)
+
+
+def repeat_vs_insar(cfg):
+    """Section 4.2: Hauraki Plains mineral-soil farmland 240 m cells grouped into quarters by InSAR rate; group medians of InSAR and repeat LiDAR."""
+    out = cfg["paths"]["out"]; a = cfg["study_area"]
+    I, tf = read(f"{out}/maps/insar_rel_240m.tif"); L = read(f"{out}/maps/repeat_rel_240m.tif")[0]
+    nr = read(f"{cfg['paths']['work']}/grid30/near_organic.tif")[0].astype(float); ny, nx = I.shape
+    near240 = nr[:ny * 8, :nx * 8].reshape(ny, 8, nx, 8).mean(axis=(1, 3))
+    YY, XX = np.mgrid[0:ny, 0:nx]; X = tf.c + (XX + .5) * 240; Y = tf.f - (YY + .5) * 240; hx0, hy0, hx1, hy1 = a["hauraki_box"]
+    m = np.isfinite(I) & np.isfinite(L) & (near240 == 0) & (X >= hx0) & (X < hx1) & (Y >= hy0) & (Y < hy1)
+    q = pd.qcut(I[m], 4, labels=False); R = dict(cells=int(m.sum()), quarters=[dict(InSAR=round(float(np.median(I[m][q == k])), 1), repeat_LiDAR=round(float(np.median(L[m][q == k])), 1)) for k in range(4)])
+    print("repeat vs InSAR", R, flush=True); return R
+
+
+_run_max = run
+def run(cfg):
+    _run_max(cfg); json.dump(repeat_vs_insar(cfg), open(f"{cfg['paths']['out']}/tables/repeat_vs_insar.json", "w"), indent=1)

@@ -110,6 +110,7 @@ insar:
   licsbas_home: /home/wharfbanger/LiCSBAS2
   zones_mm_yr: [-5, -10, -15, -20, -25, -30, -35, -40, -45, -50, -55, -60]   # as results_v55/prep_maxrate.py
   cambridge_radius_km: 3
+  cambridge_centre: [175.47, -37.89]   # town centre (lon, lat)
 
 hexagons:
   min_cells: 30
@@ -136,3 +137,18 @@ is2rate:                 # github.com/wharfbanger/is2rate v0.3.0 (local clone)
   bbox: [174.689, -38.071, 175.804, -37.140]
   start: 2018-10-13
   end: 2026-10-20
+
+south_island:            # Harvey et al. (2026) study areas; DEMs in order of precedence; reference towns (lon0, lat0, lon1, lat1)
+  Southland:
+    dems: [southland_2020-2023]
+    worldcover_tiles: [S48E165, S48E168]
+    town_box: [168.33, -46.44, 168.40, -46.38]
+    insar: Invercargill_2018_22_mask_10_04_UD_corrected_using_regression.tif
+  Canterbury:
+    dems: [canterbury_2018-2019, canterbury_2020-2023, selwyn_2023, canterbury_2016-2017]
+    worldcover_tiles: [S45E171]
+    town_box: [171.72, -43.92, 171.77, -43.88]
+    insar: Ashburton_2018_22_mask_10_04_UD_corrected_using_regression.tif
+
+qgis:
+  python: C:/OSGeo4W/bin/python-qgis-ltr.bat   # QGIS Python used to write the project (optional)

@@ -69,5 +69,16 @@ def run(cfg):
         v = np.full(len(d), np.nan); v[ok] = arr[r_[ok], c_[ok]]; return round(float(np.nanmedian(v)), 1)
     R = {"step 15": log.strip(), "classes (240 m map at segment locations)": {k: samp(M, d, 240.0) for k, d in CL.items()},
          "zones_km2": {t: round(float((M <= t).sum() * 0.0576), 1) for t in cfg["insar"]["zones_mm_yr"]}}
+    import geopandas as gpd
+    from rasterio.features import geometry_mask
+    from lib.maps import ref_adapt
+    bod = gpd.read_file(f"{cfg['paths']['raw']}/soils/Waikato_peat_bodies_stats.gpkg").to_crs(2193); kb = ~geometry_mask(bod[bod["name"] == "Kopuatai"].geometry, g.shape, tf)
+    wet = (read(f"{W}/wetfrac.tif")[0] > 0.9) & kb & np.isfinite(g); insw = g - ref_adapt(g, FARM & ~near, cfg)
+    R["Kopuatai bog (natural wetland cells, relative to mineral-soil farmland)"] = round(float(np.nanmedian(insw[wet])), 1)
+    # Section 5.2: unreferenced InSAR at mineral-soil farmland segments minus built-up land within 3 km of Cambridge
+    lo, la = cfg["insar"]["cambridge_centre"]; import pyproj
+    cx, cy = pyproj.Transformer.from_crs(4326, 2193, always_xy=True).transform(lo, la)
+    cam = S[(S.land == "built-up") & (np.hypot(S.X - cx, S.Y - cy) <= cfg["insar"]["cambridge_radius_km"] * 1000)]
+    R["mineral-soil farmland relative to Cambridge built-up land"] = round(samp(g, MIN, 30.0) - samp(g, cam, 30.0), 1); R["Cambridge built-up segments"] = int(len(cam))
     farm_area = FARM & np.isfinite(g); R["masked share of study area (%)"] = round(100 * float(1 - np.isfinite(g[np.isfinite(cop)]).mean()), 1)
     json.dump(R, open(f"{out}/tables/insar.json", "w"), indent=1); print(json.dumps(R, indent=1), flush=True)

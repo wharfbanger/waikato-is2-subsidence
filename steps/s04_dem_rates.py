@@ -102,6 +102,12 @@ def repeat_lidar(cfg):
                 for k, d in CL.items(): v[k].append(samp(t, d)[0])
         R["tie"]["spread"][f"{G // 1000} km"] = {k: dict(min=min(x), median=float(np.median(x)), max=max(x)) for k, x in v.items()}
     write(f"{work}/repeat/repeat_tied_96m.tif", t5.astype(np.float32), tf, 96.0)
+    # (2) map: 96 m rates on the 30 m grid (nearest), each farmland cell referenced locally, 240 m grid (Figure 3b)
+    from lib.maps import rel, blocks240
+    W = f"{work}/grid30"; cop, tf30 = read(f"{W}/cop30_nzvd2016.tif"); r30 = np.full(cop.shape, np.nan, np.float32)
+    reproject(rate.astype(np.float32), r30, src_transform=tf, src_crs="EPSG:2193", dst_transform=tf30, dst_crs="EPSG:2193", resampling=Resampling.nearest, src_nodata=np.nan, dst_nodata=np.nan)
+    FARM = (read(f"{W}/farmfrac.tif")[0] >= cfg["masks"]["farmland_fraction_min"]) & (read(f"{W}/slope_deg.tif")[0] < cfg["masks"]["slope_max_deg"]); nr = read(f"{W}/near_organic.tif")[0].astype(bool)
+    rr_, _ = rel(r30, FARM, FARM & ~nr, cfg); write(f"{W}/repeat_rel.tif", rr_, tf30); write(f"{out}/maps/repeat_rel_240m.tif", blocks240(rr_, cfg), tf30, 240.0)
     json.dump(R, open(f"{out}/tables/repeat_lidar.json", "w"), indent=1); print(json.dumps(R, indent=1), flush=True)
 
 

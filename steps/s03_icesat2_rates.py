@@ -59,12 +59,12 @@ def run(cfg):
     BOG = df[(df.land == "natural wetland") & (df.order == "Organic") & (df.body == "Kopuatai")]
     LOC = MIN[gpd.GeoSeries(gpd.points_from_xy(MIN.X, MIN.Y), crs=2193).within(kp.buffer(rc["bog_reference_km"] * 1000)).values]
     S = {"Organic-Soil farmland": diff_series(ORG, MIN, ms), "Kopuatai bog": diff_series(BOG, LOC, ms)}
-    A = {"mineral-soil farmland": per_pass(MIN, ms), "Organic-Soil farmland": per_pass(ORG, ms), "built-up land": per_pass(BU, 8),
+    A = {"mineral-soil farmland": per_pass(MIN, ms), "Organic-Soil farmland": per_pass(ORG, ms), "built-up land": per_pass(BU, ms),
          "Hauraki Plains mineral-soil farmland": per_pass(HAU, ms), "mineral-soil farmland within 5 km of Kopuatai": per_pass(LOC, ms)}
     R = {"segments": {k: int(len(v)) for k, v in (("Organic-Soil farmland", ORG), ("mineral-soil farmland", MIN), ("built-up land", BU), ("Kopuatai bog", BOG))}}
     R["relative to mineral-soil farmland"] = {k: fit(v, n_boot=nb) for k, v in S.items()}
     R["absolute"] = {k: fit(v, n_boot=nb) for k, v in A.items()}
-    R["relative to built-up land"] = {k: fit(diff_series(g, BU, 8), n_boot=nb) for k, g in (("mineral-soil farmland", MIN), ("Hauraki Plains mineral-soil farmland", HAU))}
+    R["relative to built-up land"] = {k: fit(diff_series(g, BU, ms), n_boot=nb) for k, g in (("mineral-soil farmland", MIN), ("Hauraki Plains mineral-soil farmland", HAU))}
     (t0, t1), (u0, u1), (v0, v1) = rc["periods"]
     R["periods"] = {k: {"Oct 2018 - Jun 2022": fit(v[(v.t >= u0) & (v.t < u1)], n_boot=nb), "Jul 2022 - Oct 2026": fit(v[(v.t >= v0) & (v.t < v1)], n_boot=nb)} for k, v in S.items()}
     R["segmented"] = {k: segmented(v, rc["break_date"], n_boot=nb) for k, v in S.items()}

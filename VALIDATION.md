@@ -99,3 +99,24 @@ zones ≤ −10/−20/−30/−40/−50/−60: 636.5 / 331.9 / 202.3 / 119.1 / 6
 - Masked-map sensitivity (tests/zones_masked.py): masked vs unmasked pipeline zones agree within about 2 mm/yr (largest: ≤ −60, InSAR period, −53.0 vs −47.1, 0.6 SE).
   The larger differences from v84 (e.g. ≤ −10, InSAR period: v84 −15.1, masked pipeline −20.7; ≤ −40: −58.8 vs −51.9) come from the v84 zone map,
   `Waikato_InSAR_rate_rel_local_pasture_240m.tif`, an older map version that differs cell by cell from the stated chain (5th/95th percentile ±6 mm/yr), not from the mask.
+
+## Steps 4–5 additions (17 Nov 2026)
+- Repeat LiDAR 240 m map (Figure 3b) built in step 4; Section 4.2 InSAR quarters (Hauraki Plains mineral-soil farmland, 240 m cells): InSAR −8.4 to +7.3, repeat LiDAR −1.5 to +1.3, 1,543 cells (v84: −9.1 to +7.3, −2.0 to +0.8, 1,708).
+- Kopuatai bog InSAR (wetland cells on the Kopuatai body, referenced locally): −28.4 unmasked (v84 −26.0, masked).
+- Mineral-soil farmland InSAR relative to Cambridge built-up land (3 km of the centre): −18.8 unmasked (v84 −18.1, published map without rescaling).
+
+## Step 7 — weather: reproduced (rain 1,190 / 1,632 mm/yr; soil moisture 0.360 / 0.394; water years identical; ERA5 1,006 / 1,323 / 1,176; LiDAR − Copernicus interval 1,159 vs 1,160 from the 2024.24 vs 2024.2 date).
+
+## Step 8 — Canterbury and Southland
+| Quantity | v84 | Pipeline |
+|---|---|---|
+| Southland farmland absolute | −1.6 (−3.4 to +0.1), 244 | −1.5 (−3.4 to +0.4), 246 |
+| Southland rel. built-up | +1.1 (−5.2 to +6.9), 62 | +3.6 (−1.1 to +8.3), 53 |
+| Southland fastest-InSAR farmland rel. built-up | +0.1 | +2.3 |
+| Canterbury farmland absolute | −1.7 (−4.0 to +0.8), 222 | −1.6 (−3.3 to +0.2), 222 |
+| Canterbury rel. built-up | +2.3 (−2.1 to +6.9), 83 | +1.4 (−2.6 to +5.4), 72 |
+| InSAR on farmland / built-up | −16.3/−0.2, −6.7/−0.1 | identical |
+v84 used 15 segments per pass for farmland and 8 for built-up land, and bootstrap CIs; the pipeline uses the Methods' 10 and t-distribution CIs.
+Step 3 aligned to 10 for built-up land: Waikato mineral-soil farmland relative to built-up land +2.9 ± 1.9 (100 passes); built-up absolute −1.9.
+
+## Step 9 — outputs: Table3/Table4.xlsx, paper_values.json, plot workbooks, GeoTIFF/GeoPackage maps, waikato_is2.qgz (checked by rendering).
