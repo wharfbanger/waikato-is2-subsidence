@@ -1,0 +1,115 @@
+# All parameters of the pipeline (Table S1). Paths are relative to this file.
+paths:
+  raw: data/raw
+  work: data/work
+  out: outputs
+
+study_area:            # NZTM 2000 (EPSG:2193)
+  xmin: 1750000
+  xmax: 1846000
+  ymin: 5785000
+  ymax: 5886000
+  hauraki_box: [1805000, 5840000, 1846000, 5886000]
+  hamilton_box: [1775000, 5785000, 1822000, 5850000]
+
+lidar:
+  waikato: [waikato_2024, waikato_2021]          # precedence for ICESat-2 residuals
+  repeat_pair: [huntly_2015-2019, waikato_2024]
+  southland: [southland_2020-2023]
+  canterbury: [canterbury_2018-2019, canterbury_2020-2023, selwyn_2023, canterbury_2016-2017]
+  resolutions_m: {icesat2: 4, repeat: 8, lidcop: 30}
+
+copernicus:
+  tiles: [S38_00_E174_00, S38_00_E175_00, S39_00_E174_00, S39_00_E175_00]
+  date: 2013.0
+
+masks:
+  worldcover_farmland: [30, 40]
+  worldcover_builtup: 50
+  farmland_fraction_min: 0.9
+  slope_max_deg: 3
+  buffer_m: 500
+
+grids:
+  map_cell_m: 240
+  map_cell_min_fill: 0.25
+  hex_width_m: 3000
+  hex_origin: [1750880.6, 5786524.8]
+  square_origin: [1750000, 5785000]
+  bias_square_m: 10000
+  tie_square_m: 5000
+
+icesat2:
+  sliderule:            # atl06p request
+    srt: land
+    cnf: surface-low
+    atl08_class: ground
+    len: 20
+    res: 10
+    cnt: 5
+    ats: 5
+    maxi: 6
+    H_min_win: 3
+    sigma_r_max: 5
+    t0: "2018-10-13"
+    t1: "2026-10-20"
+  screening:
+    n_photons_min: 10
+    h_sigma_max: 0.15
+    dh_fit_dx_max: 0.03
+    w_surface_window_max: 4
+    terrain_slope_max_deg: 2
+    residual_max_m: 0.5
+  rates:
+    min_segments_per_pass: 10
+    min_passes: 8
+    periods: [[2018.78, 2026.80], [2018.78, 2022.5], [2022.5, 2026.80]]
+    break_date: 2022.5
+    bog_reference_km: 5
+    n_boot: 2000
+    n_boot_amplitude: 500
+  survey_bias:
+    date_2021: 2021.14     # 22 February 2021
+    window_years: 0.75
+    min_passes: 3
+
+maps:
+  ref_window_km: [3, 6, 10]
+  ref_min_cells: 30
+  ref_cap_mm_yr: 400
+  block_bootstrap_km: 10
+  n_block_boot: 300
+
+repeat_lidar:
+  cell_m: 96
+  tie_min_cells: 50
+
+insar:
+  frame: 073D_12785_121717
+  start: "20180709"
+  end: "20220630"
+  clip: [174.716, 175.940, -38.237, -37.094]
+  step11: {unw_thre: 0.3, coh_thre: 0.05}
+  step12: {loop_thre: 1.5, multi_prime: true}
+  step15: {coh_thre: 0.05, n_unw_r_thre: 141, vstd_thre: 2, maxTlen_thre: 1, n_gap_thre: 30, stc_thre: 5, n_ifg_noloop_thre: 50, n_loop_err_thre: 100, resid_rms_thre: 10}
+  zones_mm_yr: [-5, -10, -15, -20, -25, -30, -35, -40, -45, -50, -55, -60]   # as results_v55/prep_maxrate.py
+  cambridge_radius_km: 3
+
+hexagons:
+  min_cells: 30
+  reference_km: 10
+  n_boot: 300
+
+max_rates:
+  distance_bands_m: [0, 250, 500, 1000, 1500, 2000, 3000]
+
+sensitivity:
+  buffers_m: [250, 500, 1000, 2000]
+  ref_caps_mm_yr: [100, 200, 400, 1000, null]
+
+weather:
+  rain_point: [-37.645, 175.434]
+  soil_point: [-37.6, 175.4]
+  soil_layer: soil_moisture_28_to_100cm
+  smooth_days: 30
+  anomaly_base: [2017, 2026]
