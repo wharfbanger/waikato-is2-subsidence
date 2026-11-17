@@ -123,3 +123,10 @@ Step 3 aligned to 10 for built-up land: Waikato mineral-soil farmland relative t
 
 ## Decision (user, 17 Nov 2026): tied repeat LiDAR = median over 16 placements of the 5 km grid
 Default placement alone lay near the fast end of the spread (independent check of v83). Medians: Organic-Soil farmland −18.5 (placements −20.5 to −16.0), mineral +0.9, Hauraki Plains mineral +0.9, Kopuatai bog −12.1 (default placement −19.0, +1.1, +1.1, −10.7). Draft v86.
+
+## Decision (user, 17 Nov 2026): LiDAR − Copernicus on farmland; no grassland category (draft v87)
+Fifth independent check: Section 3.4 (farmland) and Table S1 (grassland) disagreed. The grassland rule was inherited from dem_hex.py, not chosen.
+- Crop-canopy test: mineral-soil cropland +4.3 vs grassland +3.3 (no false subsidence on cropland), so no bias from crops in the Copernicus DSM.
+- Cropped Organic Soils subside faster: ICESat-2 −21.6 ± 2.2 (cropland) vs −17.9 ± 1.6 (grassland); LiDAR − Copernicus −20.2 vs −15.2. Grassland-only excluded them.
+- Now farmland cells and farmland reference everywhere (Table value, bands, hexagons with widened reference, cap test); survey bias measured on mineral-soil farmland (+3.5 cm; grassland +3.6).
+- LiDAR − Copernicus −17.2 (95% CI −20.2 to −14.0), about 11% less than ICESat-2 and within its uncertainty (was −14.1, "about 25% less"). Hexagons 472, r = 0.63 / 0.58.

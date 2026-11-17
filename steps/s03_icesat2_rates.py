@@ -33,7 +33,7 @@ def survey_bias(cfg, raw_df):
     Also the farmland-minus-built-up check of both surveys within one year of each."""
     sb = cfg["icesat2"]["survey_bias"]; G = cfg["grids"]["bias_square_m"]; out = {}
     for yr, tm in (("2021", sb["date_2021"]), ("2024", sb["date_2024"])):
-        d = raw_df[raw_df["L" + yr].notna() & (raw_df["S" + yr] < 2) & ((raw_df.t - tm).abs() < sb["window_years"]) & raw_df.wc_solid & (raw_df.wc == 30) & ~raw_df.near_peat].copy()
+        d = raw_df[raw_df["L" + yr].notna() & (raw_df["S" + yr] < 2) & ((raw_df.t - tm).abs() < sb["window_years"]) & raw_df.wc_solid & raw_df.wc.isin(FARM) & ~raw_df.near_peat].copy()
         d["r"] = d.H - d["L" + yr]; d = d[(d.r - d.r.median()).abs() < 0.5]; d["b"] = (d.X // G).astype(int) * 1000 + (d.Y // G).astype(int)
         pp = d.groupby(["b", "pass"]).r.median().reset_index(); bb = pp.groupby("b").r.agg(["median", "size"]); bb = bb[bb["size"] >= sb["min_passes"]]
         out[f"grid_{yr}"] = dict(regional_cm=round(float(pp.r.median()) * 100, 1), squares=int(len(bb)), p10_p90_cm=[round(float(np.percentile(bb["median"], q)) * 100, 1) for q in (10, 90)])
@@ -63,6 +63,7 @@ def run(cfg):
          "Hauraki Plains mineral-soil farmland": per_pass(HAU, ms), "mineral-soil farmland within 5 km of Kopuatai": per_pass(LOC, ms)}
     R = {"segments": {k: int(len(v)) for k, v in (("Organic-Soil farmland", ORG), ("mineral-soil farmland", MIN), ("built-up land", BU), ("Kopuatai bog", BOG))}}
     R["relative to mineral-soil farmland"] = {k: fit(v, n_boot=nb) for k, v in S.items()}
+    R["Organic-Soil farmland by land cover"] = {k: fit(diff_series(ORG[ORG.wc == c], MIN, ms), n_boot=nb) for k, c in (("grassland", 30), ("cropland", 40))}
     R["absolute"] = {k: fit(v, n_boot=nb) for k, v in A.items()}
     R["relative to built-up land"] = {k: fit(diff_series(g, BU, ms), n_boot=nb) for k, g in (("mineral-soil farmland", MIN), ("Hauraki Plains mineral-soil farmland", HAU))}
     (t0, t1), (u0, u1), (v0, v1) = rc["periods"]

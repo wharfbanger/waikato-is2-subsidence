@@ -1,7 +1,7 @@
 """Step 4 (Table S1): LiDAR - Copernicus and repeat LiDAR.
 (a) LiDAR - Copernicus: the 2021 LiDAR corrected by its ICESat-2 survey bias (10 km grid, step 3; correcting the 2024 survey too changes nothing after referencing), minus the NZVD2016 Copernicus DEM,
     divided by the interval; the 2024 pair where it exists, else the 2021 pair; each farmland cell referenced locally; 240 m map;
-    Organic-Soil farmland value (median of grassland cells) with a 10 km block-bootstrap CI.
+    Organic-Soil farmland value (median of farmland cells, farmland reference) with a 10 km block-bootstrap CI; grassland-only as a sensitivity.
 Outputs: data/work/grid30/lidcop_rate.tif, lidcop_rel.tif; outputs/maps/lidcop_rel_240m.tif; outputs/tables/lidcop.json."""
 import json, os, numpy as np, rasterio
 from lib.maps import read, rel, ref_adapt, blocks240, block_id, block_boot, bias_grid
@@ -33,7 +33,7 @@ def run(cfg):
     R = {}
     for tag, c24 in (("2021 survey bias-corrected (Methods; used)", False), ("both surveys bias-corrected (as the v84 code)", True)):
         C, src, tf = lidar_copernicus(cfg, c24); cap = cfg["maps"]["ref_cap_mm_yr"]
-        ok = PEAT & np.isfinite(C) & (np.abs(C) < cap); ref = ref_adapt(C, NONP, cfg); okr = ok & np.isfinite(ref); r = (C - ref)[okr]
+        ok = FARM & org & np.isfinite(C) & (np.abs(C) < cap); ref = ref_adapt(C, NONPF, cfg); okr = ok & np.isfinite(ref); r = (C - ref)[okr]
         R[tag] = dict(cells=int(okr.sum()), median_rel=round(float(np.median(r)), 1),
                       median_rel_CI=block_boot(r, block_id(C.shape, tf, cfg["maps"]["block_bootstrap_km"] * 1000)[okr], cfg["maps"]["n_block_boot"]),
                       unreferenced_reference_median=round(float(np.nanmedian(ref[okr])), 1), cells_2024_pair=int((src == 2).sum()), cells_2021_pair=int((src == 1).sum()))
@@ -41,6 +41,16 @@ def run(cfg):
         if not c24:
             write(f"{W}/lidcop_rate.tif", C, tf); relf, _ = rel(C, FARM, NONPF, cfg); write(f"{W}/lidcop_rel.tif", relf, tf)
             M = blocks240(relf, cfg); write(f"{out}/maps/lidcop_rel_240m.tif", M, tf, 240.0)
+    C, src, tf = lidar_copernicus(cfg, False); ok = PEAT & np.isfinite(C) & (np.abs(C) < cap); ref = ref_adapt(C, NONP, cfg); okr = ok & np.isfinite(ref); r = (C - ref)[okr]
+    R["sensitivity: grassland cells and grassland reference (v86)"] = dict(cells=int(okr.sum()), median_rel=round(float(np.median(r)), 1),
+        median_rel_CI=block_boot(r, block_id(C.shape, tf, cfg["maps"]["block_bootstrap_km"] * 1000)[okr], cfg["maps"]["n_block_boot"]))
+    # Organic-Soil farmland by land cover (farmland reference): grassland >= 90% and cropland >= 50% of the 30 m cell
+    from rasterio.warp import reproject, Resampling
+    C, _, tf = lidar_copernicus(cfg, False); ref = ref_adapt(C, NONPF, cfg); ok = np.isfinite(C) & (np.abs(C) < cap) & np.isfinite(ref) & org
+    with rasterio.open(f"{cfg['paths']['raw']}/worldcover/ESA_WorldCover_10m_2021_v200_S39E174_Map.tif") as w:
+        win = rasterio.windows.from_bounds(174.85, -38.2, 175.8, -36.95, w.transform).round_offsets().round_lengths(); s_ = w.read(1, window=win); wt = w.window_transform(win)
+    crop = np.zeros(C.shape, np.float32); reproject((s_ == 40).astype(np.float32), crop, src_transform=wt, src_crs="EPSG:4326", dst_transform=tf, dst_crs="EPSG:2193", resampling=Resampling.average)
+    R["Organic-Soil farmland by land cover"] = {k: round(float(np.median((C - ref)[ok & m])), 1) for k, m in (("grassland", PAST), ("cropland", (crop >= 0.5) & FARM))}
     json.dump(R, open(f"{out}/tables/lidcop.json", "w"), indent=1)
 
 

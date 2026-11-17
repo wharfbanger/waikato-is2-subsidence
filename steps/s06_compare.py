@@ -1,6 +1,6 @@
 """Step 6 (Table S1): hexagons, maximum rates and sensitivity.
 (a) ICESat-2 hexagon rates with is2rate (3 km, regional seasonal cycle), from the step-2 SlideRule download and the step-1 LiDAR mosaics;
-(b) LiDAR - Copernicus and InSAR on the same hexagons: median of at least 30 referenced 30 m grassland cells; hexagons at least 25% farmland;
+(b) LiDAR - Copernicus and InSAR on the same hexagons: median of at least 30 referenced 30 m farmland cells; hexagons at least 25% farmland;
     Pearson r with the ICESat-2 hexagon rates;
 (c) maximum rates with is2rate: distance bands inside Organic Soils and InSAR zones, three periods (Table 4).
 Outputs: outputs/maps/hex_3km.gpkg, outputs/tables/hexagons.json, outputs/tables/max_rates.json."""
@@ -17,7 +17,10 @@ def is2rate(cfg, name, extra, out_dir):
              dem_geoid=os.path.abspath(f"{raw}/proj/nz_linz_nzgeoid2016.tif").replace("\\", "/"), landcover="worldcover",
              exclude=os.path.abspath(f"{raw}/soils/smap_organic_waikato.shp").replace("\\", "/"), exclude_buffer_m=cfg["masks"]["buffer_m"],
              segments_file=os.path.abspath(f"{raw}/icesat2").replace("\\", "/") + "/Waikato_??_atl06sr.parquet", out_dir=os.path.abspath(out_dir).replace("\\", "/"), name=name)
-    P.update(extra); pf = f"{out_dir}/{name}_params.txt"; open(pf, "w").write("\n".join(f"{k} = {v}" for k, v in P.items()) + "\n")
+    P.update(extra); pf = f"{out_dir}/{name}_params.txt"; txt = "\n".join(f"{k} = {v}" for k, v in P.items()) + "\n"
+    done = os.path.exists(f"{out_dir}/{name}_target.json") or os.path.exists(f"{out_dir}/{name}_hexagons.gpkg")
+    if done and os.path.exists(pf) and open(pf).read() == txt and not cfg.get("force_is2rate"): return out_dir   # same parameters, already run
+    open(pf, "w").write(txt)
     r = subprocess.run([sys.executable, i["script"], pf], capture_output=True, text=True); open(f"{out_dir}/{name}.log", "w").write(r.stdout + r.stderr)
     if r.returncode: raise RuntimeError(f"is2rate {name} failed; see {out_dir}/{name}.log")
     return out_dir
@@ -36,7 +39,8 @@ def hexagons(cfg):
     hx.loc[~keep, ["rate", "se"]] = np.nan; cap = cfg["maps"]["ref_cap_mm_yr"]; R = {}
     for nm, f in (("LiDAR - Copernicus", "lidcop_rate.tif"), ("InSAR", "insar_up.tif")):
         a = read(f"{W}/{f}")[0]; v = np.where(np.isfinite(a) & (np.abs(a) < cap), a, np.nan)
-        ref = local_ref(v, NONP, cfg["maps"]["ref_window_km"][0] * 1000, cap, cfg["maps"]["ref_min_cells"]); P3 = PAST & np.isfinite(v) & np.isfinite(ref)
+        from lib.maps import ref_adapt
+        ref = ref_adapt(v, FARM & ~near, cfg); P3 = FARM & np.isfinite(v) & np.isfinite(ref)   # farmland cells, farmland reference widened where sparse (Section 3.2)
         g = pd.DataFrame(dict(hid=hid[P3], v=(v - ref)[P3])).groupby("hid").v.agg(["median", "size"]); g = g[(g["size"] >= h["min_cells"]) & g.index.isin(hx.hid[keep])]
         col = "dem_rate" if nm.startswith("LiDAR") else "insar_rate"; hx[col] = hx.hid.map(g["median"])
         both = hx[col].notna() & hx.rate.notna()
@@ -51,7 +55,7 @@ def run(cfg):
 
 def max_rates(cfg):
     """Table 4: ICESat-2 rate of each subset (one target, regional mineral-soil reference on the same passes) per period, with is2rate;
-    InSAR map median of each zone; LiDAR - Copernicus median of the referenced 30 m grassland cells of each band."""
+    InSAR map median of each zone; LiDAR - Copernicus median of the referenced 30 m farmland cells of each band."""
     from rasterio.features import shapes, geometry_mask
     from shapely.geometry import shape
     from lib.maps import ref_adapt
@@ -77,7 +81,7 @@ def max_rates(cfg):
         print(nm, R[nm], flush=True)
     W = f"{work}/grid30"; m = cfg["masks"]; slope, tf30 = read(f"{W}/slope_deg.tif"); grass = read(f"{W}/grassfrac.tif")[0]
     near = read(f"{W}/near_organic.tif")[0].astype(bool); orgm = read(f"{W}/organic.tif")[0].astype(bool)
-    PAST = (grass >= m["farmland_fraction_min"]) & (slope < m["slope_max_deg"]); C = read(f"{W}/lidcop_rate.tif")[0]; cap = cfg["maps"]["ref_cap_mm_yr"]
+    PAST = (read(f"{W}/farmfrac.tif")[0] >= m["farmland_fraction_min"]) & (slope < m["slope_max_deg"]); C = read(f"{W}/lidcop_rate.tif")[0]; cap = cfg["maps"]["ref_cap_mm_yr"]   # farmland
     ref = ref_adapt(C, PAST & ~near, cfg); ok = PAST & orgm & np.isfinite(C) & (np.abs(C) < cap) & np.isfinite(ref); relc = C - ref
     for nm, g in T.items():
         if nm.startswith("band"):
@@ -122,7 +126,7 @@ def sensitivity(cfg):
         MIN = F[(F.order != "Organic") & (F.order != "not mapped") & (F.dist > b)] if b != cfg["masks"]["buffer_m"] else F[(F.order != "Organic") & (F.order != "not mapped") & ~F.near_peat]
         f = fit(diff_series(ORG, MIN, rc["min_segments_per_pass"]), n_boot=0); R["buffer_m"][b] = dict(rate=f["rate"], se=f["se"], passes=f["passes"])
     m = cfg["masks"]; slope = read(f"{W}/slope_deg.tif")[0]; grass = read(f"{W}/grassfrac.tif")[0]; near = read(f"{W}/near_organic.tif")[0].astype(bool)
-    PAST = (grass >= m["farmland_fraction_min"]) & (slope < m["slope_max_deg"]); C = read(f"{W}/lidcop_rate.tif")[0]; PEAT = PAST & (org > 0)
+    PAST = (read(f"{W}/farmfrac.tif")[0] >= m["farmland_fraction_min"]) & (slope < m["slope_max_deg"]); C = read(f"{W}/lidcop_rate.tif")[0]; PEAT = PAST & (org > 0)   # farmland
     for cap in cfg["sensitivity"]["ref_caps_mm_yr"]:
         c2 = dict(cfg, maps=dict(cfg["maps"], ref_cap_mm_yr=cap if cap else 1e9)); ref = ref_adapt(C, PAST & ~near, c2)
         okc = PEAT & np.isfinite(C) & (np.abs(C) < (cap if cap else 1e9)) & np.isfinite(ref); R["reference_cap_mm_yr"][str(cap)] = round(float(np.median((C - ref)[okc])), 1)
