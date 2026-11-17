@@ -1,6 +1,7 @@
 # All parameters of the pipeline (Table S1). Paths are relative to this file.
 paths:
   raw: data/raw
+  laz: C:/Users/wharf/Documents/Waikato_IS2_repro/raw/opentopo     # LINZ point clouds (OpenTopography)
   linz_dem: C:/Users/wharf/Documents/Waikato_IS2_repro/raw/linz_dem   # 1 m tiles; step 1 downloads any that are missing
   work: data/work
   out: outputs
@@ -89,6 +90,10 @@ maps:
 repeat_lidar:
   cell_m: 96
   tie_min_cells: 50
+  farm_fraction_min: 0.9
+  laz_earlier: NZ15_Huntly
+  laz_later: NZ24_Waikato
+  interval_collection_yr: 7.24   # used where a cell has no capture dates
 
 insar:
   frame: 073D_12785_121717

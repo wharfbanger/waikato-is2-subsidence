@@ -54,3 +54,18 @@ The paper takes the pipeline's mineral-soil values (study rectangle, S-map soil 
 | Unreferenced mineral reference | +24.3 | +24.3 |
 - Correcting the 2024 survey for its bias as well (as the v84 code did) gives the same −14.1: the correction is nearly constant within each reference window. The pipeline follows the Methods (2021 survey only).
 - Remaining 0.2 difference: 2024 surface (above) and bootstrap seed.
+
+## Step 4b — repeat LiDAR (17 Nov 2026, 461 s incl. capture dates from 2,891 LAZ tiles)
+96 m grid from the study-area corner (v84: from tile bounds, 16 m offset); capture dates = median GPS time per cell (every 20th return).
+| Quantity | v84 | Pipeline |
+|---|---|---|
+| Area differenced | 335 km² | 337 km² |
+| Same campaign, northern Torehape (Feb 2015 → 2024) | −13.8 cm, 9.0 yr, −15.4 | −13.7 cm, 9.0 yr, −15.3 |
+| Same campaign, southern Torehape (2017–18 → 2024) | −17.3 cm, 6.1 yr, −28.8 | −17.2 cm, 6.1 yr, −28.7 |
+| Same campaign, drained margins of Kopuatai | −7.2 cm, 5.9 yr, −12.1 | −7.4 cm, 5.9 yr, −12.5 |
+| Mineral-soil farmland untied, 2015 / 2017–18 flights | +2.7 / +10.8 | +2.8 / +10.7 |
+| Tied (5 km), Organic-Soil farmland | −19.0 | −19.0 (tie +1.2, option 1) |
+| Tied, mineral / Hauraki Plains mineral | +1.1 / +1.1 | +1.1 / +1.1 |
+| Tied, Kopuatai bog | −10.3 | −10.7 |
+| Grid-placement spread, Organic: 5 km / 10 km | −20.0 to −16.5 / −22.1 to −14.3 | −20.5 to −16.0 / −21.6 to −15.3 |
+All within 0.5 mm/yr; differences from the 16 m grid offset and the tie value (+1.2 instead of +1.4).
