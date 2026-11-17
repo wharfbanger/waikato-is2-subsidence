@@ -38,3 +38,19 @@ Consequence: the repeat-LiDAR tie uses the mineral-soil absolute rate; +1.2 inst
 ## Steps 2–3 end to end (17 Nov 2026)
 - Step 2 run from the raw SlideRule download, LINZ tiles and WorldCover (256 s): every column of `segments.parquet` is identical to the v84 working file (3,074,432 rows; heights, LiDAR heights and slopes differ by 0.0).
 - Step 3 on the step-2 output gives results identical to the test run above.
+
+## Decision (user, 17 Nov 2026): option 1
+The paper takes the pipeline's mineral-soil values (study rectangle, S-map soil order, NZTM Hauraki box): mineral-soil farmland +1.2 ± 1.4 absolute, +2.5 ± 2.1 relative to built-up land, Hauraki Plains +2.9 ± 1.7. The tie uses +1.2. To be applied in v85 with the step-4 results.
+- Section 3.3 compares unlike quantities: "ICESat-2 heights exceed the 2021 LiDAR by 3.6 cm on average [absolute, grassland grid] ... against 0.8 cm for the 2024 LiDAR [farmland minus built-up, same passes]". Like for like: absolute 2021 +3.6 cm vs 2024 −2.5 cm (grassland, 10 km grid regional; farmland median −1.8 cm); farmland minus built-up 2021 4.2 cm vs 2024 0.8 cm. v84 (dem_hex.py) corrects both surveys with their own 10 km grids; the pipeline does the same and the text must say so.
+
+## Step 1 — grids (17 Nov 2026, 362 s)
+- Copernicus NZVD2016 30 m grid and 2021 LiDAR 30 m grid: identical to the v84 inputs (difference 0.000 m everywhere, same coverage).
+- 2024 LiDAR 30 m grid: v84 used a ~10 m mosaic in geographic coordinates (`LDS_10m_DEM_merged_downsampled.tif`, EPSG:4167), resampled twice; the pipeline averages the LINZ 1 m tiles, as the Methods state. On flat farmland: median difference −2 mm, median absolute difference 2.7 cm (about 2.4 mm/yr per cell over 11.2 years), 1.8% of cells > 0.5 m.
+
+## Step 4a — LiDAR − Copernicus (17 Nov 2026)
+| Quantity | v84 | Pipeline |
+|---|---|---|
+| Organic-Soil farmland (median of referenced grassland cells) | −14.3 (95% CI −17.6 to −10.8) | −14.1 (−16.8 to −10.7) |
+| Unreferenced mineral reference | +24.3 | +24.3 |
+- Correcting the 2024 survey for its bias as well (as the v84 code did) gives the same −14.1: the correction is nearly constant within each reference window. The pipeline follows the Methods (2021 survey only).
+- Remaining 0.2 difference: 2024 surface (above) and bootstrap seed.

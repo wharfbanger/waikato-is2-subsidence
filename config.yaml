@@ -1,6 +1,7 @@
 # All parameters of the pipeline (Table S1). Paths are relative to this file.
 paths:
   raw: data/raw
+  linz_dem: C:/Users/wharf/Documents/Waikato_IS2_repro/raw/linz_dem   # 1 m tiles; step 1 downloads any that are missing
   work: data/work
   out: outputs
 
@@ -18,6 +19,10 @@ lidar:
   southland: [southland_2020-2023]
   canterbury: [canterbury_2018-2019, canterbury_2020-2023, selwyn_2023, canterbury_2016-2017]
   resolutions_m: {icesat2: 4, repeat: 8, lidcop: 30}
+
+lidar_dates:            # decimal years of capture (2021: mid-survey; 2024: as v84)
+  waikato_2021: 2021.2
+  waikato_2024: 2024.24
 
 copernicus:
   tiles: [S38_00_E174_00, S38_00_E175_00, S39_00_E174_00, S39_00_E175_00]
@@ -70,6 +75,7 @@ icesat2:
     n_boot_amplitude: 500
   survey_bias:
     date_2021: 2021.14     # 22 February 2021
+    date_2024: 2024.24
     window_years: 0.75
     min_passes: 3
 
