@@ -106,3 +106,29 @@ def repeat_vs_insar(cfg):
 _run_max = run
 def run(cfg):
     _run_max(cfg); json.dump(repeat_vs_insar(cfg), open(f"{cfg['paths']['out']}/tables/repeat_vs_insar.json", "w"), indent=1)
+
+
+def sensitivity(cfg):
+    """Section 5.3: (1) buffer-zone width for the ICESat-2 Organic-Soil farmland rate; (2) reference cap for LiDAR - Copernicus."""
+    from scipy.ndimage import distance_transform_edt
+    from lib.is2 import diff_series, fit
+    from lib.maps import ref_adapt
+    work, out = cfg["paths"]["work"], cfg["paths"]["out"]; W = f"{work}/grid30"; rc = cfg["icesat2"]["rates"]; R = {"buffer_m": {}, "reference_cap_mm_yr": {}}
+    org, tf = read(f"{W}/organic.tif"); dist = distance_transform_edt(org == 0) * 30.0   # distance to Organic Soils on the 30 m grid
+    S = pd.read_parquet(f"{work}/segments_classified.parquet"); r_ = ((tf.f - S.Y.values) // 30).astype(int); c_ = ((S.X.values - tf.c) // 30).astype(int)
+    ok = (r_ >= 0) & (r_ < dist.shape[0]) & (c_ >= 0) & (c_ < dist.shape[1]); S["dist"] = np.nan; S.loc[ok, "dist"] = dist[r_[ok], c_[ok]]
+    F = S[S.land == "farmland"]; ORG = F[F.order == "Organic"]
+    for b in cfg["sensitivity"]["buffers_m"]:
+        MIN = F[(F.order != "Organic") & (F.order != "not mapped") & (F.dist > b)] if b != cfg["masks"]["buffer_m"] else F[(F.order != "Organic") & (F.order != "not mapped") & ~F.near_peat]
+        f = fit(diff_series(ORG, MIN, rc["min_segments_per_pass"]), n_boot=0); R["buffer_m"][b] = dict(rate=f["rate"], se=f["se"], passes=f["passes"])
+    m = cfg["masks"]; slope = read(f"{W}/slope_deg.tif")[0]; grass = read(f"{W}/grassfrac.tif")[0]; near = read(f"{W}/near_organic.tif")[0].astype(bool)
+    PAST = (grass >= m["farmland_fraction_min"]) & (slope < m["slope_max_deg"]); C = read(f"{W}/lidcop_rate.tif")[0]; PEAT = PAST & (org > 0)
+    for cap in cfg["sensitivity"]["ref_caps_mm_yr"]:
+        c2 = dict(cfg, maps=dict(cfg["maps"], ref_cap_mm_yr=cap if cap else 1e9)); ref = ref_adapt(C, PAST & ~near, c2)
+        okc = PEAT & np.isfinite(C) & (np.abs(C) < (cap if cap else 1e9)) & np.isfinite(ref); R["reference_cap_mm_yr"][str(cap)] = round(float(np.median((C - ref)[okc])), 1)
+    json.dump(R, open(f"{out}/tables/sensitivity.json", "w"), indent=1); print("sensitivity", R, flush=True); return R
+
+
+_run_cmp = run
+def run(cfg):
+    _run_cmp(cfg); sensitivity(cfg)

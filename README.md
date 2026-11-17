@@ -7,7 +7,7 @@ python run_all.py                    # all steps
 python run_all.py --start 3 --end 4  # a range of steps
 ```
 
-All parameters are in `config.yaml`. Steps (Table S1 of the paper):
+All parameters are in `config.yaml`; put machine-specific paths (LiDAR tiles, point clouds, LiCSBAS job, is2rate clone) in an untracked `config.local.yaml`, which `run_all.py` merges over it. Raw data are not included: step 1 downloads the LINZ DEM tiles, step 2 the ICESat-2 segments (SlideRule) and step 7 the Open-Meteo series; S-map, WorldCover, Copernicus GLO-30, NZGeoid2016, the LINZ point clouds, the LiCSAR interferograms and the published South Island InSAR are listed in `docs/data_raw.md`. Steps (Table S1 of the paper):
 
 | Step | Script | Does |
 |---|---|---|

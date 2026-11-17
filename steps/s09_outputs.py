@@ -18,7 +18,7 @@ def hillshade(cfg, out):
 
 def run(cfg):
     out, work = cfg["paths"]["out"], cfg["paths"]["work"]; os.makedirs(f"{out}/plots", exist_ok=True)
-    I3, LC, RL, IN, HX, MX, WE, SI, RV = (J(out, f) for f in ("icesat2_rates.json", "lidcop.json", "repeat_lidar.json", "insar.json", "hexagons.json", "max_rates.json", "weather.json", "south_island.json", "repeat_vs_insar.json"))
+    I3, LC, RL, IN, HX, MX, WE, SI, RV, SE = (J(out, f) for f in ("icesat2_rates.json", "lidcop.json", "repeat_lidar.json", "insar.json", "hexagons.json", "max_rates.json", "weather.json", "south_island.json", "repeat_vs_insar.json", "sensitivity.json"))
     rel, ab = I3["relative to mineral-soil farmland"], I3["absolute"]; lc = next(iter(LC.values())); tc = RL["tie"]["classes"]; ic = IN["classes (240 m map at segment locations)"]
     se = lambda d: f"{d['rate']:+.1f} ± {d['se']:.1f}".replace("-", "−")
     T3 = pd.DataFrame([["Organic-Soil farmland", se(rel["Organic-Soil farmland"]), ic["Organic-Soil farmland"], lc["median_rel"], tc["Organic-Soil farmland"]["median"]],
@@ -34,7 +34,7 @@ def run(cfg):
     T4 = pd.DataFrame(rows, columns=["Subset", "Selection", "Area (km²)", "ICESat-2 Oct 2018 – Jun 2022", "ICESat-2 Jul 2022 – Oct 2026", "ICESat-2 2018–2026", "InSAR map median", "LiDAR − Copernicus median"])
     with pd.ExcelWriter(f"{out}/tables/Table3.xlsx") as xw: T3.to_excel(xw, index=False)
     with pd.ExcelWriter(f"{out}/tables/Table4.xlsx") as xw: T4.to_excel(xw, index=False)
-    V = {"icesat2": I3, "lidar_copernicus": LC, "repeat_lidar": RL, "insar": IN, "hexagons": HX, "max_rates": MX, "weather": WE, "south_island": SI, "repeat_vs_insar": RV}
+    V = {"icesat2": I3, "lidar_copernicus": LC, "repeat_lidar": RL, "insar": IN, "hexagons": HX, "max_rates": MX, "weather": WE, "south_island": SI, "repeat_vs_insar": RV, "sensitivity": SE}
     json.dump(V, open(f"{out}/tables/paper_values.json", "w"), indent=1)
     hx = gpd.read_file(f"{out}/maps/hex_3km.gpkg")
     with pd.ExcelWriter(f"{out}/plots/fig4d_hexagons.xlsx") as xw: pd.DataFrame(hx.drop(columns="geometry")).to_excel(xw, index=False)

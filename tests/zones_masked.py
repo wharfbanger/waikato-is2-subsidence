@@ -9,8 +9,10 @@ from shapely.geometry import shape
 from lib.maps import read, rel, blocks240
 from steps.s06_compare import is2rate
 cfg = yaml.safe_load(open("config.yaml")); W = "data/work/grid30"; D = "data/work/is2rate/max_masked"; os.makedirs(f"{D}/polys", exist_ok=True)
+if os.path.exists("config.local.yaml"):
+    for k, v in yaml.safe_load(open("config.local.yaml")).items(): cfg[k].update(v)
 rd = lambda p: np.fromfile(p, dtype=np.float32).reshape(1144, 1225)
-with rasterio.open(r"C:\Users\wharf\Documents\Waikato_IS2_raw_data\02_insar\licsbas_073D_2018_22\job_record\73_20180709_20220630_new_params.vel.mskd.geo.tif") as r: m14 = r.read(1)
+with rasterio.open(sys.argv[1]) as r: m14 = r.read(1)   # masked velocity GeoTIFF of the LiCSBAS new_params run (Harvey et al. 2026)
 v = np.where(np.isfinite(m14) & (m14 != 0), rd("data/work/insar/vel") / rd("data/work/insar/U.geo"), np.nan).astype(np.float32)
 cop, tf = read(f"{W}/cop30_nzvd2016.tif"); g = np.full(cop.shape, np.nan, np.float32)
 reproject(v, g, src_transform=from_origin(174.7164445 - 0.0005, -37.094 + 0.0005, 0.001, 0.001), src_crs="EPSG:4326", dst_transform=tf, dst_crs="EPSG:2193", resampling=Resampling.average, src_nodata=np.nan, dst_nodata=np.nan)
