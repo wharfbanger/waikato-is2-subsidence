@@ -84,3 +84,15 @@ All within 0.5 mm/yr; differences from the 16 m grid offset and the tie value (+
 LiCSBAS step 15 is not applied (config `insar.mask: false`), for ease of reproduction; to be stated in Table S1 (step 5) and the Methods.
 Unmasked pipeline values: Organic-Soil farmland −20.6 (masked −20.5; v84 −20.1 on v84 classes), mineral +0.5, Hauraki Plains +0.6;
 zones ≤ −10/−20/−30/−40/−50/−60: 636.5 / 331.9 / 202.3 / 119.1 / 67.1 / 37.8 km² (v84 masked: 641 / 328 / 195 / 114 / 63 / 36, Table 4).
+
+## Step 6a — hexagons (17 Nov 2026)
+- is2rate hexagon rates from the step-2 download are identical to the paper's (572 hexagons, median difference 0.0, 95th percentile 0.1 mm/yr), although the paper's run used the reproduction's separate SlideRule fetch.
+- v84 kept only hexagons that fell on an older hexagon layer (`is2_hex_smap_3km.gpkg`, v54_chain.py): an undocumented extent rule. On that layer the pipeline gives 453 hexagons, r = 0.61 (LiDAR − Copernicus) and 0.57 (InSAR, unmasked) vs v84 454, 0.62, 0.59.
+- Pipeline rule (Methods): hexagons at least 25% farmland with their centre in the study rectangle: 471 hexagons, r = 0.58 and 0.55.
+
+## Step 6b — maximum rates, Table 4 (17 Nov 2026, 54 is2rate runs, 55 min)
+- Distance bands: ICESat-2 rates identical to v84 in all three periods (largest difference 0.3 mm/yr, 2022–2026, 250–500 m); areas identical.
+- LiDAR − Copernicus band medians: −8.5, −12.1, −18.3, −22.2, −23.5, −25.7 vs v84 −8.5, −12.4, −18.5, −22.4, −23.9, −26.1 (2024 surface from 1 m tiles).
+- InSAR zones (unmasked pipeline map; areas in km²): ≤ −40 mm/yr 119.1 km² (v84 114.5); 2018–2026 rates within 2 mm/yr at ≤ −25 and stricter;
+  at loose thresholds the InSAR-period rate moves more: ≤ −10 −22.4 ± 4.2 (v84 −15.1 ± 3.8), ≤ −20 −28.6 ± 4.9 (v84 −31.9 ± 4.8).
+  Sensitivity run with the masked pipeline map: tests/zones_masked.py (pending).

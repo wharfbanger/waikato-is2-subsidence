@@ -32,7 +32,8 @@ def hexagons(cfg):
     flat = slope < m["slope_max_deg"]; PAST = (grass >= m["farmland_fraction_min"]) & flat; FARM = (farmf >= m["farmland_fraction_min"]) & flat; NONP = PAST & ~near
     hid = rasterize([(g, int(k)) for g, k in zip(hx.geometry, hx.hid)], out_shape=slope.shape, transform=tf, fill=-1, dtype="int32")
     inn = hid >= 0; nall = np.bincount(hid[inn], minlength=nh); nf = np.bincount(hid[inn & FARM], minlength=nh); hx["farm_share"] = (nf / np.maximum(nall, 1))[hx.hid.values]
-    keep = hx.farm_share >= h["min_farm_share"]; hx.loc[~keep, ["rate", "se"]] = np.nan; cap = cfg["maps"]["ref_cap_mm_yr"]; R = {}
+    a = cfg["study_area"]; keep = (hx.farm_share >= h["min_farm_share"]) & hx.x.between(a["xmin"], a["xmax"]) & hx.y.between(a["ymin"], a["ymax"]);   # centre in the study rectangle
+    hx.loc[~keep, ["rate", "se"]] = np.nan; cap = cfg["maps"]["ref_cap_mm_yr"]; R = {}
     for nm, f in (("LiDAR - Copernicus", "lidcop_rate.tif"), ("InSAR", "insar_up.tif")):
         a = read(f"{W}/{f}")[0]; v = np.where(np.isfinite(a) & (np.abs(a) < cap), a, np.nan)
         ref = local_ref(v, NONP, cfg["maps"]["ref_window_km"][0] * 1000, cap, cfg["maps"]["ref_min_cells"]); P3 = PAST & np.isfinite(v) & np.isfinite(ref)
