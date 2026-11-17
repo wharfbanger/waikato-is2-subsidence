@@ -28,17 +28,9 @@ def classify(cfg):
 
 
 def survey_bias(cfg, raw_df):
-    """Per 10 km square: median over passes of the per-pass median ICESat-2 minus 2021 LiDAR residual on mineral-soil grassland
-    (pure 3 x 3 window, > 500 m from Organic Soils), passes within 0.75 year of 22 February 2021; squares with >= 3 passes, others regional.
-    Also the farmland-minus-built-up check of both surveys within one year of each."""
-    sb = cfg["icesat2"]["survey_bias"]; G = cfg["grids"]["bias_square_m"]; out = {}
-    for yr, tm in (("2021", sb["date_2021"]), ("2024", sb["date_2024"])):
-        d = raw_df[raw_df["L" + yr].notna() & (raw_df["S" + yr] < 2) & ((raw_df.t - tm).abs() < sb["window_years"]) & raw_df.wc_solid & raw_df.wc.isin(FARM) & ~raw_df.near_peat].copy()
-        d["r"] = d.H - d["L" + yr]; d = d[(d.r - d.r.median()).abs() < 0.5]; d["b"] = (d.X // G).astype(int) * 1000 + (d.Y // G).astype(int)
-        pp = d.groupby(["b", "pass"]).r.median().reset_index(); bb = pp.groupby("b").r.agg(["median", "size"]); bb = bb[bb["size"] >= sb["min_passes"]]
-        out[f"grid_{yr}"] = dict(regional_cm=round(float(pp.r.median()) * 100, 1), squares=int(len(bb)), p10_p90_cm=[round(float(np.percentile(bb["median"], q)) * 100, 1) for q in (10, 90)])
-        bb.rename(columns={"median": "bias_m", "size": "passes"}).assign(x0=lambda t: (t.index // 1000) * G, y0=lambda t: (t.index % 1000) * G).to_csv(f"{cfg['paths']['work']}/bias{yr}_10km.csv")
-        with open(f"{cfg['paths']['work']}/bias{yr}_regional.txt", "w") as fh: fh.write(str(float(pp.r.median())))
+    """Survey offset of each LiDAR survey on farmland: ICESat-2 minus LiDAR on mineral-soil farmland minus the same on built-up land, per pass
+    (passes within one year of the survey), median over passes. Not applied: offsets cancel in the local reference (Section 3.3)."""
+    out = {}
     farm = raw_df.wc_solid & raw_df.wc.isin(FARM); built = raw_df.wc_solid & (raw_df.wc == BUILT)
     for yr, tm in (("2021", 2021.14), ("2024", 2024.24)):
         e = raw_df[raw_df["L" + yr].notna() & (raw_df["S" + yr] < 2) & ((raw_df.t - tm).abs() < 1.0)].copy(); e["r"] = e.H - e["L" + yr]; e = e[(e.r - e.r.median()).abs() < 0.5]

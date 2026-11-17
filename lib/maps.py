@@ -37,9 +37,10 @@ def blocks240(a, cfg, B=8):
     with np.errstate(all="ignore"): return np.nanmedian(np.where(n[..., None] >= cfg["grids"]["map_cell_min_fill"] * B * B, v, np.nan), axis=-1)
 
 
-def block_id(shape, tf, size_m):
+def block_id(shape, tf, size_m, origin=(0.0, 0.0)):
+    """Square id of each cell; squares of size_m counted from origin (the study-area corner, Table S1)."""
     YY, XX = np.mgrid[0:shape[0], 0:shape[1]]; xc = tf.c + (XX + .5) * tf.a; yc = tf.f + (YY + .5) * tf.e
-    return (xc // size_m).astype(np.int64) * 1000 + (yc // size_m).astype(np.int64)
+    return ((xc - origin[0]) // size_m).astype(np.int64) * 1000 + ((yc - origin[1]) // size_m).astype(np.int64)
 
 
 def block_boot(vals, blocks, n_boot, stat=np.median, seed=0):
@@ -48,7 +49,7 @@ def block_boot(vals, blocks, n_boot, stat=np.median, seed=0):
     return [round(float(np.percentile(res, 2.5)), 1), round(float(np.percentile(res, 97.5)), 1)]
 
 
-def bias_grid(csv, regional_m, shape, tf, size_m):
+def bias_grid(csv, regional_m, shape, tf, size_m, origin=(0.0, 0.0)):
     """Survey bias (m) per 10 km square from step 3; squares without a value take the regional value."""
-    b = pd.read_csv(csv, index_col=0)["bias_m"]; bid = block_id(shape, tf, size_m)
+    b = pd.read_csv(csv, index_col=0)["bias_m"]; bid = block_id(shape, tf, size_m, origin)
     return pd.Series(bid.ravel()).map(b).fillna(regional_m).values.reshape(shape).astype(np.float32)

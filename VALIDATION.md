@@ -130,3 +130,8 @@ Fifth independent check: Section 3.4 (farmland) and Table S1 (grassland) disagre
 - Cropped Organic Soils subside faster: ICESat-2 −21.6 ± 2.2 (cropland) vs −17.9 ± 1.6 (grassland); LiDAR − Copernicus −20.2 vs −15.2. Grassland-only excluded them.
 - Now farmland cells and farmland reference everywhere (Table value, bands, hexagons with widened reference, cap test); survey bias measured on mineral-soil farmland (+3.5 cm; grassland +3.6).
 - LiDAR − Copernicus −17.2 (95% CI −20.2 to −14.0), about 11% less than ICESat-2 and within its uncertainty (was −14.1, "about 25% less"). Hexagons 472, r = 0.63 / 0.58.
+
+## Sixth independent check (v87) and decisions (17 Nov 2026; drafts v88, v89)
+- Block bootstrap: the pipeline counted 10 km squares from round 10 km lines, Table S1 from the study-area corner (5,785,000 N). Fixed to the corner: 42 squares (as the check), CI widens from about 7 to 10 mm/yr; also the bias grid. The CI depends on square placement (5.6–9.6 mm/yr wide for 5 km shifts).
+- Survey bias: the absolute 2021 bias depends on the statistic (segment median +5.0 cm; median over passes +2.1; mean over passes +0.6). Correcting or not changes LiDAR − Copernicus by 0.1 (−17.2 uncorrected, −17.1 with the 4.2 cm same-pass offset, −17.3 with the old grid). Decision (user): no survey-bias correction; Section 3.3 removed, one sentence in the LiDAR − Copernicus paragraph; offsets reported as farmland minus built-up on the same passes (4.2 / 0.8 cm).
+- LiDAR − Copernicus (v89): −17.2 (95% CI −21.9 to −12.1), unreferenced mineral reference +20.0; hexagons r = 0.64 / 0.58 (472).
