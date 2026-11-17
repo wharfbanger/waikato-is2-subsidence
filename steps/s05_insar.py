@@ -1,6 +1,6 @@
 """Step 5 (Table S1): InSAR vertical velocity.
-(a) LiCSBAS in WSL: steps 01-13 (batch_LiCSBAS.sh) unless a time series already exists in the job folder, then step 15 with the thresholds
-    of config.yaml in the pipeline's own copy of the time series (the original job is never modified); step 16 is not used;
+(a) LiCSBAS in WSL: steps 01-13 (batch_LiCSBAS.sh) unless a time series already exists in the job folder; no noise mask (step 15) by default,
+    for ease of reproduction (insar.mask: true applies step 15 with the config thresholds in a copy of the time series); step 16 not used;
 (b) vertical = line-of-sight velocity / up component of the unit vector; masked; averaged to the 30 m grid;
 (c) each farmland cell referenced locally (as step 4); 240 m map; class values at the ICESat-2 segment locations; InSAR zones.
 Outputs: data/work/insar/vel_up.tif, grid30/insar_rel.tif, outputs/maps/insar_rel_240m.tif, outputs/tables/insar.json."""
@@ -17,6 +17,11 @@ def wsl_path(p): p = os.path.abspath(p).replace("\\", "/"); return f"/mnt/{p[0].
 def licsbas(cfg, D):
     """Writes and runs a WSL script; returns the folder holding results/ of the pipeline's step-15 run."""
     i = cfg["insar"]; s15 = i["step15"]; T = f"{i['wsl_pipeline_dir']}/TS"
+    step15 = "" if not i["mask"] else f"""mkdir -p {T}; [ -f {T}/cum.h5 ] || cp $J/TS_GEOCml1clip/cum.h5 {T}/
+rm -rf {T}/results {T}/info {T}/network; cp -r $J/TS_GEOCml1clip/results $J/TS_GEOCml1clip/info $J/TS_GEOCml1clip/network {T}/
+cd {i['wsl_pipeline_dir']}
+LiCSBAS15_mask_ts.py -t TS -c {s15['coh_thre']} -u {s15['n_unw_r_thre']} -v {s15['vstd_thre']} -T {s15['maxTlen_thre']} -g {s15['n_gap_thre']} -s {s15['stc_thre']} -i {s15['n_ifg_noloop_thre']} -l {s15['n_loop_err_thre']} -r {s15['resid_rms_thre']} | sed -n '/Noise index/,/Kept/p'
+cp {T}/results/mask {wsl_path(D)}/"""
     sh = f"""#!/bin/bash
 set -e
 source ~/miniconda3/etc/profile.d/conda.sh; conda activate {i['conda_env']}
@@ -29,11 +34,8 @@ if [ ! -f $J/TS_GEOCml1clip/cum.h5 ]; then
   sed -i 's#^p05_clip_range_geo=.*#p05_clip_range_geo="{'/'.join(str(x) for x in i['clip'])}"#; s#^p12_multi_prime=.*#p12_multi_prime="y"#' batch_LiCSBAS.sh
   ./batch_LiCSBAS.sh
 fi
-mkdir -p {T}; [ -f {T}/cum.h5 ] || cp $J/TS_GEOCml1clip/cum.h5 {T}/
-rm -rf {T}/results {T}/info {T}/network; cp -r $J/TS_GEOCml1clip/results $J/TS_GEOCml1clip/info $J/TS_GEOCml1clip/network {T}/
-cd {i['wsl_pipeline_dir']}
-LiCSBAS15_mask_ts.py -t TS -c {s15['coh_thre']} -u {s15['n_unw_r_thre']} -v {s15['vstd_thre']} -T {s15['maxTlen_thre']} -g {s15['n_gap_thre']} -s {s15['stc_thre']} -i {s15['n_ifg_noloop_thre']} -l {s15['n_loop_err_thre']} -r {s15['resid_rms_thre']} | sed -n '/Noise index/,/Kept/p'
-cp {T}/results/vel {T}/results/mask {wsl_path(D)}/; cp $J/GEOCml1clip/U.geo $J/GEOCml1clip/EQA.dem_par {wsl_path(D)}/
+{step15}
+cp $J/TS_GEOCml1clip/results/vel {wsl_path(D)}/; cp $J/GEOCml1clip/U.geo $J/GEOCml1clip/EQA.dem_par {wsl_path(D)}/
 """
     p = f"{D}/run_licsbas.sh"; open(p, "w", newline="\n").write(sh)
     r = subprocess.run(["wsl.exe", "bash", wsl_path(p)], capture_output=True, text=True); print(r.stdout, r.stderr[-2000:], flush=True)
@@ -47,8 +49,8 @@ def run(cfg):
     par = dict(l.split(":")[0:2] for l in open(f"{D}/EQA.dem_par") if ":" in l); w, h = int(par["width"]), int(par["nlines"])
     lat0, lon0, dlat, dlon = (float(par[k].split()[0]) for k in ("corner_lat", "corner_lon", "post_lat", "post_lon"))
     rd = lambda f: np.fromfile(f"{D}/{f}", dtype=np.float32).reshape(h, w)
-    vel, U, mask = rd("vel"), rd("U.geo"), rd("mask")
-    vup = np.where(np.isfinite(mask) & (mask > 0), vel / U, np.nan).astype(np.float32); vup[~np.isfinite(vup)] = np.nan
+    vel, U = rd("vel"), rd("U.geo"); keep = (rd("mask") > 0) if cfg["insar"]["mask"] else np.ones(vel.shape, bool)   # no mask by default (reproducibility)
+    vup = np.where(keep, vel / U, np.nan).astype(np.float32); vup[~np.isfinite(vup)] = np.nan
     tf4326 = from_origin(lon0 - dlon / 2, lat0 - dlat / 2, dlon, -dlat)   # EQA corner is a pixel centre
     with rasterio.open(f"{D}/vel_up.tif", "w", driver="GTiff", height=h, width=w, count=1, dtype="float32", crs="EPSG:4326", transform=tf4326, nodata=np.nan) as o: o.write(vup, 1)
     cop, tf = read(f"{W}/cop30_nzvd2016.tif"); g = np.full(cop.shape, np.nan, np.float32)

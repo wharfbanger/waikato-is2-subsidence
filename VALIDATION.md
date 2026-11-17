@@ -79,3 +79,8 @@ All within 0.5 mm/yr; differences from the 16 m grid offset and the tie value (+
 | Organic-Soil farmland (240 m map at segment locations) | −20.1 | see insar.json (soil-order classes; v84 used the peat shapefile and Nth_Waikato polygon) |
 - Mask sensitivity on the pipeline chain: no mask gives Organic −20.6 (masked −20.5) and zones 1–4% larger (−10 to −60 mm/yr); LiCSBAS default n_unw/vstd thresholds give zones 2–20% smaller.
 - Kopuatai bog InSAR: pipeline −10.5 (240 m farmland map at bog segments) vs v84 −26.0 (peat_bodies.py: wetland cells referenced to mineral farmland); definition to be ported in step 6.
+
+## Decision (user, 17 Nov 2026): no InSAR mask
+LiCSBAS step 15 is not applied (config `insar.mask: false`), for ease of reproduction; to be stated in Table S1 (step 5) and the Methods.
+Unmasked pipeline values: Organic-Soil farmland −20.6 (masked −20.5; v84 −20.1 on v84 classes), mineral +0.5, Hauraki Plains +0.6;
+zones ≤ −10/−20/−30/−40/−50/−60: 636.5 / 331.9 / 202.3 / 119.1 / 67.1 / 37.8 km² (v84 masked: 641 / 328 / 195 / 114 / 63 / 36, Table 4).
