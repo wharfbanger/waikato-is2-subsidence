@@ -1,4 +1,4 @@
-"""Repeat LiDAR helpers: 96 m medians of 8 m differences, and per-cell capture dates from the GPS time of laser returns."""
+"""Repeat LiDAR helpers: grid-cell medians of finer differences (Table S1: 30 m cells of 10 m differences), and per-cell capture dates from the GPS time of laser returns."""
 import concurrent.futures as cf, glob, os, numpy as np, pandas as pd, rasterio
 from rasterio.warp import reproject, Resampling
 from rasterio.transform import from_origin
@@ -6,8 +6,8 @@ from rasterio.transform import from_origin
 GPS0 = np.datetime64("1980-01-06T00:00:00", "s")
 
 
-def diff96(cfg, colA, colB, F=8, RES=96):
-    """2024 minus earlier survey at 8 m, on the 8 m grid from the study-area corner, then the median of each 96 m cell (12 x 12)."""
+def diff_grid(cfg, colA, colB, F, RES):
+    """2024 minus earlier survey at F m (1 m tiles decimated), on the F m grid from the study-area corner, then the median of each RES m cell."""
     a = cfg["study_area"]; tf8 = from_origin(a["xmin"], a["ymax"], F, F); sh8 = (int((a["ymax"] - a["ymin"]) / F), int((a["xmax"] - a["xmin"]) / F))
     d = cfg["paths"]["linz_dem"]; names = sorted(set(os.listdir(f"{d}/{colA}")) & set(os.listdir(f"{d}/{colB}")))
     D = np.full(sh8, np.nan, np.float32)
@@ -49,8 +49,8 @@ def _laz_cells(args):
         print("LAZ error", f, e, flush=True); return None
 
 
-def capture_dates(cfg, dataset, cache, RES=96, step=20):
-    """Median capture date (decimal year) of each 96 m cell from every 20th laser return of each LAZ tile; cached."""
+def capture_dates(cfg, dataset, cache, RES, step=20):
+    """Median capture date (decimal year) of each RES m cell from every 20th laser return of each LAZ tile; cached."""
     if os.path.exists(cache): c = pd.read_parquet(cache)
     else:
         a = cfg["study_area"]; fs = sorted(glob.glob(f"{cfg['paths']['laz']}/{dataset}/*.laz")); out = []

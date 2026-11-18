@@ -73,7 +73,14 @@ def run(cfg):
     C30 = {"Organic-Soil farmland": FARM & org, "mineral-soil farmland": FARM & ~near, "Hauraki Plains mineral-soil farmland": FARM & ~near & HBX}
     import re as _re
     cnt = {k: int(v) for k, v in _re.findall(r"^(interferograms_input|acquisitions_input) (\d+)", log, _re.M)}
-    R = {"LiCSBAS network": cnt, "step 15": log.strip(), "classes (median of 30 m farmland cells)": {k: round(float(np.nanmedian(relv[m])), 1) for k, m in C30.items()},
+    from lib.maps import block_id, block_boot
+    oc = FARM & org & np.isfinite(relv); G = cfg["maps"]["block_bootstrap_km"] * 1000
+    org_ci = block_boot(relv[oc], block_id(relv.shape, tf, G, cfg["grids"]["square_origin"])[oc], cfg["maps"]["n_block_boot"])
+    sites = {}
+    if os.path.exists(f"{work}/repeat/sites_30m.tif"):
+        sc_ = read(f"{work}/repeat/sites_30m.tif")[0]
+        for i, nm in enumerate(("northern Torehape", "southern Torehape", "drained margins of Kopuatai"), 1): sites[nm] = round(float(np.nanmedian(relv[sc_ == i])), 1)
+    R = {"LiCSBAS network": cnt, "Organic-Soil farmland 95% CI (10 km block bootstrap)": org_ci, "repeat LiDAR sites (median of 30 m farmland cells)": sites, "step 15": log.strip(), "classes (median of 30 m farmland cells)": {k: round(float(np.nanmedian(relv[m])), 1) for k, m in C30.items()},
          "classes (240 m map at segment locations)": {k: samp(M, d, 240.0) for k, d in CL.items()},
          "zones_km2": {t: round(float((M <= t).sum() * 0.0576), 1) for t in cfg["insar"]["zones_mm_yr"]}}
     import geopandas as gpd

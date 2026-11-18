@@ -20,7 +20,7 @@ lidar:
   repeat_pair: [huntly_2015-2019, waikato_2024]
   southland: [southland_2020-2023]
   canterbury: [canterbury_2018-2019, canterbury_2020-2023, selwyn_2023, canterbury_2016-2017]
-  resolutions_m: {icesat2: 4, repeat: 8, lidcop: 30}
+  resolutions_m: {icesat2: 4, repeat: 10, lidcop: 30}   # repeat: 1 m tiles decimated to 10 m, then 30 m cell medians
 
 lidar_dates:            # decimal years of capture (2021: mid-survey; 2024: as v84)
   waikato_2021: 2021.2
@@ -89,7 +89,7 @@ maps:
   n_block_boot: 300
 
 repeat_lidar:
-  cell_m: 96
+  cell_m: 30             # the 30 m grid of the other maps (96 m in v92: rates within 1 mm/yr)
   tie_min_cells: 50
   farm_fraction_min: 0.9
   laz_earlier: NZ15_Huntly

@@ -57,6 +57,8 @@ The paper takes the pipeline's mineral-soil values (study rectangle, S-map soil 
 
 ## Step 4b — repeat LiDAR (17 Nov 2026, 461 s incl. capture dates from 2,891 LAZ tiles)
 96 m grid from the study-area corner (v84: from tile bounds, 16 m offset); capture dates = median GPS time per cell (every 20th return).
+
+18 Nov 2026 (paper v93): moved to 30 m cells (median of 3 x 3 cells of 10 m; the 30 m grid of the other maps) to use one analysis grid. 96 m vs 30 m: northern Torehape -15.3 vs -15.4, southern Torehape -28.7 vs -28.4, Kopuatai margins -12.5 vs -12.5 mm/yr (same campaign); tied Organic-Soil farmland -18.5 vs -17.4 (16-placement range -20.3 to -15.6). The table below is the 96 m run.
 | Quantity | v84 | Pipeline |
 |---|---|---|
 | Area differenced | 335 km² | 337 km² |
