@@ -36,7 +36,6 @@ def run(cfg):
     with pd.ExcelWriter(f"{out}/tables/Table3.xlsx") as xw: T3.to_excel(xw, index=False)
     with pd.ExcelWriter(f"{out}/tables/Table4.xlsx") as xw: T4.to_excel(xw, index=False)
     V = {"icesat2": I3, "lidar_copernicus": LC, "repeat_lidar": RL, "insar": IN, "hexagons": HX, "max_rates": MX, "weather": WE, "south_island": SI, "repeat_vs_insar": RV, "sensitivity": SE}
-    if os.path.exists(f"{out}/tables/max_rates_zones_masked.json"): V["max_rates_zones_masked"] = J(out, "max_rates_zones_masked.json")   # tests/zones_masked.py
     json.dump(V, open(f"{out}/tables/paper_values.json", "w"), indent=1)
     hx = gpd.read_file(f"{out}/maps/hex_3km.gpkg")
     with pd.ExcelWriter(f"{out}/plots/fig4d_hexagons.xlsx") as xw: pd.DataFrame(hx.drop(columns="geometry")).to_excel(xw, index=False)

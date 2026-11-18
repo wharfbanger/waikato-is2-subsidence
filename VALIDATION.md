@@ -147,3 +147,9 @@ is2rate runs are now reused only when the target polygon is unchanged (md5 in th
 Differences from the sixth check explained: survey offsets (median vs mean over passes, and scatter between passes); InSAR class values (now medians of 30 m cells, as LiDAR − Copernicus: −20.3 vs check −20.5);
 bog passes (reference within 5 km of the Kopuatai body vs of the bog); Hauraki quarters (240 m cells entirely > 500 m from Organic Soils vs mostly mineral). Hexagons 486 vs 477: edge rules, not pursued.
 A provenance scan of v90 finds no number without a pipeline or config source other than the study-area coordinates and instrument facts.
+
+## Seventh independent check (v90) and draft v91 (17 Nov 2026)
+Reproduced: LiDAR − Copernicus CI (now ~10% wider in the check), unreferenced reference (+20.0 both), InSAR class values, InSAR-period agreement (no longer borderline), Hauraki quarters, bog, all of Table 5.
+- Mask sensitivity: the check applied the mask pixel by pixel; the pipeline masked before averaging (7.1% removed). Pixel by pixel: 10.0% removed, Organic change 1.3 (check 10.0%, 1.39). Decision (user): Section 5.3 keeps one sentence with these two numbers; mask thresholds dropped from Table S1; zone test (tests/zones_masked.py) removed.
+- Survey offsets: not reproducible to better than a few cm (pass selection); stated qualitatively.
+- SE ratios: "within about 20% (median 0.96)"; bands: "about 2–3 mm/yr further inside".

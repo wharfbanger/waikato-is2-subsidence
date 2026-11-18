@@ -88,8 +88,9 @@ def run(cfg):
     cam = S[(S.land == "built-up") & (np.hypot(S.X - cx, S.Y - cy) <= cfg["insar"]["cambridge_radius_km"] * 1000)]
     R["mineral-soil farmland relative to Cambridge built-up land"] = round(samp(g, MIN, 30.0) - samp(g, cam, 30.0), 1); R["Cambridge built-up segments"] = int(len(cam))
     # mask sensitivity (Section 5.3): the step-15 mask of Harvey et al. (2026) thresholds, applied to the same velocity
-    vm = np.where(msk, vel / U, np.nan).astype(np.float32); gm = np.full(cop.shape, np.nan, np.float32)
-    reproject(vm, gm, src_transform=tf4326, src_crs="EPSG:4326", dst_transform=tf, dst_crs="EPSG:2193", resampling=Resampling.average, src_nodata=np.nan, dst_nodata=np.nan)
+    mn = np.zeros(cop.shape, np.float32)   # mask applied pixel by pixel: a 30 m cell is removed when its InSAR pixel (nearest) is masked
+    reproject(msk.astype(np.float32), mn, src_transform=tf4326, src_crs="EPSG:4326", dst_transform=tf, dst_crs="EPSG:2193", resampling=Resampling.nearest)
+    gm = np.where(mn > 0.5, g, np.nan).astype(np.float32)
     relm, _ = rel(gm, FARM, FARM & ~near, cfg); Mm = blocks240(relm, cfg); of = FARM & org & np.isfinite(g)
     R["mask sensitivity"] = dict(Organic_farmland_cells_removed_pct=round(100 * float((of & ~np.isfinite(gm)).sum() / of.sum()), 1),
         Organic_change=round(float(np.nanmedian(relm[FARM & org]) - np.nanmedian(relv[FARM & org])), 1),
