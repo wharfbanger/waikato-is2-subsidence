@@ -96,11 +96,20 @@ def repeat_lidar(cfg):
     CAP = {"Feb 2015": t1 < 2016, "Dec 2017 - Mar 2018": t1 > 2017.5}
     SITES = {"northern Torehape": (P & body["Torehape"], "Feb 2015"), "southern Torehape": (P & body["Torehape"], "Dec 2017 - Mar 2018"),
              "drained margins of Kopuatai": (P & body["Kopuatai"], "Dec 2017 - Mar 2018")}
+    # flights of the earlier survey (capture dates): each has its own height offset, so each site cell is referenced to mineral-soil farmland of its own flight
+    # (v96; the 2017-18 campaign pooled the December 2017 and March 2018 flights, whose mineral-soil farmland differs by 3.3 mm/yr)
+    FL = {"Feb 2015": t1 < 2016, "Dec 2017": (t1 > 2017.5) & (t1 < rl["flight_split_yr"]), "Mar 2018": t1 >= rl["flight_split_yr"]}
+    REFR = {f: float(np.median(rate[MIN & c])) for f, c in FL.items()}; REFD = {f: float(np.median(dh[MIN & c])) for f, c in FL.items()}
+    rref, dref = np.full(sh, np.nan), np.full(sh, np.nan)
+    for f, c in FL.items(): rref[c] = REFR[f]; dref[c] = REFD[f]
     R["same campaign"] = {}
     for nm, (m, cp) in SITES.items():
-        tm, rm = m & CAP[cp], MIN & CAP[cp]
-        R["same campaign"][nm] = dict(campaign=cp, dh_cm=round(float(np.median(dh[tm]) - np.median(dh[rm])) * 100, 1), interval_yr=round(float(np.median(dt[tm])), 1),
-                                      rate=round(float(np.median(rate[tm]) - np.median(rate[rm])), 1), target_cells=int(tm.sum()), reference_cells=int(rm.sum()))
+        tm = m & CAP[cp]
+        R["same campaign"][nm] = dict(campaign=cp, dh_cm=round(float(np.median(dh[tm] - dref[tm])) * 100, 1), interval_yr=round(float(np.median(dt[tm])), 1),
+                                      rate=round(float(np.median(rate[tm] - rref[tm])), 1), target_cells=int(tm.sum()),
+                                      cells_by_flight={f: int((tm & c).sum()) for f, c in FL.items() if (tm & c).sum()},
+                                      rate_by_flight={f: round(float(np.median(rate[tm & c]) - REFR[f]), 1) for f, c in FL.items() if (tm & c).sum() >= 20},
+                                      reference_cells={f: int((MIN & c).sum()) for f, c in FL.items() if (tm & c).sum()})
     # site masks (Table 4 rows): written on the 30 m grid for steps 5 (InSAR) and here (LiDAR - Copernicus)
     if RS == 30:
         code = np.zeros(sh, np.uint8)
@@ -109,6 +118,13 @@ def repeat_lidar(cfg):
         lr = read(f"{cfg['paths']['work']}/grid30/lidcop_rel.tif")[0]
         for i, nm in enumerate(SITES, 1): R["same campaign"][nm]["LiDAR - Copernicus median"] = round(float(np.nanmedian(lr[code == i])), 1)
     R["mineral-soil farmland, untied"] = {cp: round(float(np.median(rate[MIN & c])), 1) for cp, c in CAP.items()}
+    R["mineral-soil farmland, untied, by flight"] = {f: round(v, 1) for f, v in REFR.items()}
+    # 10 km squares (bootstrap grid) holding the cells of the bog and of each site (Table 4 note)
+    YYc, XXc = np.mgrid[0:sh[0], 0:sh[1]]; Xc = tf.c + (XXc + .5) * RS; Yc = tf.f - (YYc + .5) * RS; bx0, by0 = cfg["grids"]["square_origin"]; Gb = cfg["maps"]["block_bootstrap_km"] * 1000
+    sq = ((Xc - bx0) // Gb).astype(np.int64) * 100000 + ((Yc - by0) // Gb).astype(np.int64)
+    def nsq(m):
+        u, c = np.unique(sq[m], return_counts=True); c = np.sort(c)[::-1]; return dict(squares=int(u.size), share_of_two_largest=round(float(c[:2].sum() / c.sum()), 2))
+    R["10 km squares"] = {nm: nsq(m & CAP[cp]) for nm, (m, cp) in SITES.items()}
     # (3) tie to ICESat-2 on a square grid; class rates are medians over 16 grid placements
     TIE = json.load(open(f"{out}/tables/icesat2_rates.json"))["absolute"]["mineral-soil farmland"]["rate"]
     npk = (fa > rl["farm_fraction_min"]) & ~near & np.isfinite(rate)

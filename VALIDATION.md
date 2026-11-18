@@ -155,3 +155,5 @@ Reproduced: LiDAR − Copernicus CI (now ~10% wider in the check), unreferenced 
 - Mask sensitivity: the check applied the mask pixel by pixel; the pipeline masked before averaging (7.1% removed). Pixel by pixel: 10.0% removed, Organic change 1.3 (check 10.0%, 1.39). Decision (user): Section 5.3 keeps one sentence with these two numbers; mask thresholds dropped from Table S1; zone test (tests/zones_masked.py) removed.
 - Survey offsets: not reproducible to better than a few cm (pass selection); stated qualitatively.
 - SE ratios: "within about 20% (median 0.96)"; bands: "about 2–3 mm/yr further inside".
+
+18 Nov 2026 (paper v96): the 2017-18 repeat-LiDAR campaign is two flights (December 2017, March 2018) with different offsets (mineral-soil farmland untied +13.4 vs +10.1 mm/yr). Same-flight reference per cell: southern Torehape -28.4 -> -30.1 (flights -33.3 / -24.6), Kopuatai margins -12.5 -> -12.0 (March 2018 only); northern Torehape unchanged. Independent check (v94) split by flight: -31.0 / -24.4. Note: 10 m reads use the COG overviews of the 1 m tiles (LERC, max error 0.1 m in overviews).

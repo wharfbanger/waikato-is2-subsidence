@@ -76,12 +76,14 @@ def run(cfg):
     from lib.maps import block_id, block_boot
     oc = FARM & org & np.isfinite(relv); G = cfg["maps"]["block_bootstrap_km"] * 1000
     org_ci = block_boot(relv[oc], block_id(relv.shape, tf, G, cfg["grids"]["square_origin"])[oc], cfg["maps"]["n_block_boot"])
+    M30 = np.full(relv.shape, np.nan, np.float32); M30[:M.shape[0] * 8, :M.shape[1] * 8] = np.repeat(np.repeat(M, 8, 0), 8, 1)   # v96: grid effect alone (same cells)
     sites = {}
     if os.path.exists(f"{work}/repeat/sites_30m.tif"):
         sc_ = read(f"{work}/repeat/sites_30m.tif")[0]
         for i, nm in enumerate(("northern Torehape", "southern Torehape", "drained margins of Kopuatai"), 1): sites[nm] = round(float(np.nanmedian(relv[sc_ == i])), 1)
     R = {"LiCSBAS network": cnt, "Organic-Soil farmland 95% CI (10 km block bootstrap)": org_ci, "repeat LiDAR sites (median of 30 m farmland cells)": sites, "step 15": log.strip(), "classes (median of 30 m farmland cells)": {k: round(float(np.nanmedian(relv[m])), 1) for k, m in C30.items()},
          "classes (240 m map at segment locations)": {k: samp(M, d, 240.0) for k, d in CL.items()},
+         "classes (240 m map at the 30 m farmland cells of the class)": {k: round(float(np.nanmedian(M30[m])), 1) for k, m in C30.items()},
          "zones_km2": {t: round(float((M <= t).sum() * 0.0576), 1) for t in cfg["insar"]["zones_mm_yr"]}}
     import geopandas as gpd
     from rasterio.features import geometry_mask
@@ -89,6 +91,9 @@ def run(cfg):
     bod = gpd.read_file(f"{cfg['paths']['raw']}/soils/Waikato_peat_bodies_stats.gpkg").to_crs(2193); kb = ~geometry_mask(bod[bod["name"] == "Kopuatai"].geometry, g.shape, tf)
     wet = (read(f"{W}/wetfrac.tif")[0] > 0.9) & kb & np.isfinite(g); insw = g - ref_adapt(g, FARM & ~near, cfg)
     R["Kopuatai bog (natural wetland cells, relative to mineral-soil farmland)"] = round(float(np.nanmedian(insw[wet])), 1)
+    bid = block_id(g.shape, tf, G, cfg["grids"]["square_origin"])   # v96: 10 km squares holding the bog cells (Table 4 note)
+    u_, c_ = np.unique(bid[wet], return_counts=True); c_ = np.sort(c_)[::-1]
+    R["Kopuatai bog, 10 km squares"] = dict(squares=int(u_.size), share_of_two_largest=round(float(c_[:2].sum() / c_.sum()), 2))
     # Section 5.2: unreferenced InSAR at mineral-soil farmland segments minus built-up land within 3 km of Cambridge
     lo, la = cfg["insar"]["cambridge_centre"]; import pyproj
     cx, cy = pyproj.Transformer.from_crs(4326, 2193, always_xy=True).transform(lo, la)

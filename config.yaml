@@ -95,6 +95,7 @@ repeat_lidar:
   laz_earlier: NZ15_Huntly
   laz_later: NZ24_Waikato
   interval_collection_yr: 7.24   # used where a cell has no capture dates
+  flight_split_yr: 2018.08      # earlier survey: capture dates before this (and after 2017.5) are the December 2017 flight, after it March 2018
 
 insar:
   frame: 073D_12785_121717
