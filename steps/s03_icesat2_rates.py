@@ -60,9 +60,10 @@ def run(cfg):
     R["relative to built-up land"] = {k: fit(diff_series(g, BU, ms), n_boot=nb) for k, g in (("mineral-soil farmland", MIN), ("Hauraki Plains mineral-soil farmland", HAU))}
     (t0, t1), (u0, u1), (v0, v1) = rc["periods"]
     R["periods"] = {k: {"Oct 2018 - Jun 2022": fit(v[(v.t >= u0) & (v.t < u1)], n_boot=nb), "Jul 2022 - Oct 2026": fit(v[(v.t >= v0) & (v.t < v1)], n_boot=nb)} for k, v in S.items()}
-    R["segmented"] = {k: segmented(v, rc["break_date"], n_boot=nb) for k, v in S.items()}
+    nb6 = rc["n_boot_table6"]   # v98: Table 6 CIs from 20,000 resamples (bog CIs seed-sensitive at 2,000)
+    R["segmented"] = {k: segmented(v, rc["break_date"], n_boot=nb6) for k, v in S.items()}
     R["seasonal amplitude"] = {k: amplitude(A[k], rc["n_boot_amplitude"]) for k in ("Organic-Soil farmland", "mineral-soil farmland")}
-    R["separate fits, before minus after"] = {k: separate_difference(v, rc["break_date"], n_boot=nb) for k, v in S.items()}
+    R["separate fits, before minus after"] = {k: separate_difference(v, rc["break_date"], n_boot=nb6) for k, v in S.items()}
     LOC3 = MIN[gpd.GeoSeries(gpd.points_from_xy(MIN.X, MIN.Y), crs=2193).within(kp.buffer(3000)).values]
     R["Kopuatai bog, reference within 3 km"] = fit(diff_series(BOG, LOC3, ms), n_boot=0)
     R["Organic-Soil farmland without annual cycle"] = fit(S["Organic-Soil farmland"], n_boot=0, seasonal=False)

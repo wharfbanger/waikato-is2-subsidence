@@ -74,6 +74,7 @@ icesat2:
     break_date: 2022.5
     bog_reference_km: 5
     n_boot: 2000
+    n_boot_table6: 20000   # segmented fit and separate-fit change (Table 6)
     n_boot_amplitude: 500
   survey_bias:
     date_2021: 2021.14     # 22 February 2021

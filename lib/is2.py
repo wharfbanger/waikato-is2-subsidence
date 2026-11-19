@@ -73,7 +73,8 @@ def segmented(pp, t_break, n_boot=2000, seed=5):
         bs.append(one(p))
     bs = np.array(bs); ci = lambda v: [round(float(np.percentile(v, 2.5)), 1), round(float(np.percentile(v, 97.5)), 1)]
     return dict(before=round(float(b0), 1), before_CI=ci(bs[:, 0]), after=round(float(a0), 1), after_CI=ci(bs[:, 1]), after_minus_before=round(float(a0 - b0), 1),
-                diff_CI=ci(bs[:, 1] - bs[:, 0]), step_mm=round(float(s0), 1), step_CI=ci(bs[:, 2]), passes=int(len(passes)))
+                diff_CI=ci(bs[:, 1] - bs[:, 0]), step_mm=round(float(s0), 1), step_CI=ci(bs[:, 2]), passes=int(len(passes)),
+                n_boot=n_boot, dropped_share=round(1 - len(bs) / n_boot, 3))   # v98: dropped = resample lacks a DEM of the full fit
 
 
 def amplitude(pp, n_boot=500, seed=3):
@@ -99,4 +100,5 @@ def separate_difference(pp, t_break, n_boot=2000, seed=5):
     for _ in range(n_boot):
         p = pp.iloc[np.concatenate([grp[x] for x in rng.choice(passes, len(passes))])]
         if (p.t < t_break).sum() > 5 and (p.t >= t_break).sum() > 5: bs.append(one(p))
-    return dict(before_minus_after=round(float(d0), 1), CI=[round(float(np.percentile(bs, 2.5)), 1), round(float(np.percentile(bs, 97.5)), 1)])
+    return dict(before_minus_after=round(float(d0), 1), CI=[round(float(np.percentile(bs, 2.5)), 1), round(float(np.percentile(bs, 97.5)), 1)],
+                n_boot=n_boot, dropped_share=round(1 - len(bs) / n_boot, 3))   # v98: dropped = a period with five or fewer pass-DEM values, repeats counted
