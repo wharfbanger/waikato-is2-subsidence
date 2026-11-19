@@ -119,6 +119,12 @@ def repeat_lidar(cfg):
         for i, nm in enumerate(SITES, 1): R["same campaign"][nm]["LiDAR - Copernicus median"] = round(float(np.nanmedian(lr[code == i])), 1)
     R["mineral-soil farmland, untied"] = {cp: round(float(np.median(rate[MIN & c])), 1) for cp, c in CAP.items()}
     R["mineral-soil farmland, untied, by flight"] = {f: round(v, 1) for f, v in REFR.items()}
+    # v97: capture dates of each flight (farmland cells used; 1st-99th percentile), cells between flights, and farmland cells without a date
+    def _d(y): return str((np.datetime64("1970-01-01T00:00:00", "s") + np.timedelta64(int((float(y) - 1970) * 365.2425 * 86400 + 13 * 3600), "s")).astype("datetime64[D]"))   # inverse of lib/repeat.py decimal year; NZ daylight time (UTC+13)
+    R["flights, capture dates of farmland cells (1st-99th percentile, NZDT)"] = {f: [_d(np.percentile(t1[ok & c], 1)), _d(np.percentile(t1[ok & c], 99))] for f, c in FL.items()}
+    FA = np.isfinite(dh) & (fa > rl["farm_fraction_min"]) & (np.abs(dh) < 1)
+    R["farmland cells between flights (2016 - mid 2017; not used)"] = int((FA & (t1 >= 2016) & (t1 <= 2017.5)).sum())
+    R["farmland cells without a capture date (interval of the collections used; not in same-flight rates)"] = {"cells": int((FA & ~np.isfinite(dt)).sum()), "share": round(float((FA & ~np.isfinite(dt)).sum() / FA.sum()), 3)}
     # 10 km squares (bootstrap grid) holding the cells of the bog and of each site (Table 4 note)
     YYc, XXc = np.mgrid[0:sh[0], 0:sh[1]]; Xc = tf.c + (XXc + .5) * RS; Yc = tf.f - (YYc + .5) * RS; bx0, by0 = cfg["grids"]["square_origin"]; Gb = cfg["maps"]["block_bootstrap_km"] * 1000
     sq = ((Xc - bx0) // Gb).astype(np.int64) * 100000 + ((Yc - by0) // Gb).astype(np.int64)

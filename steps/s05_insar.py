@@ -77,13 +77,17 @@ def run(cfg):
     oc = FARM & org & np.isfinite(relv); G = cfg["maps"]["block_bootstrap_km"] * 1000
     org_ci = block_boot(relv[oc], block_id(relv.shape, tf, G, cfg["grids"]["square_origin"])[oc], cfg["maps"]["n_block_boot"])
     M30 = np.full(relv.shape, np.nan, np.float32); M30[:M.shape[0] * 8, :M.shape[1] * 8] = np.repeat(np.repeat(M, 8, 0), 8, 1)   # v96: grid effect alone (same cells)
+    def maj(m):   # v97: 240 m cells where most valid 30 m cells are of the class
+        ny, nx = M.shape; v = np.isfinite(relv[:ny * 8, :nx * 8]); k = (m[:ny * 8, :nx * 8] & v).reshape(ny, 8, nx, 8).sum((1, 3)); n = v.reshape(ny, 8, nx, 8).sum((1, 3))
+        return np.isfinite(M) & (k * 2 > n)
     sites = {}
     if os.path.exists(f"{work}/repeat/sites_30m.tif"):
         sc_ = read(f"{work}/repeat/sites_30m.tif")[0]
         for i, nm in enumerate(("northern Torehape", "southern Torehape", "drained margins of Kopuatai"), 1): sites[nm] = round(float(np.nanmedian(relv[sc_ == i])), 1)
     R = {"LiCSBAS network": cnt, "Organic-Soil farmland 95% CI (10 km block bootstrap)": org_ci, "repeat LiDAR sites (median of 30 m farmland cells)": sites, "step 15": log.strip(), "classes (median of 30 m farmland cells)": {k: round(float(np.nanmedian(relv[m])), 1) for k, m in C30.items()},
          "classes (240 m map at segment locations)": {k: samp(M, d, 240.0) for k, d in CL.items()},
-         "classes (240 m map at the 30 m farmland cells of the class)": {k: round(float(np.nanmedian(M30[m])), 1) for k, m in C30.items()},
+         "classes (240 m map and 30 m cells, paired: cells with a 240 m value)": {k: {"30 m": round(float(np.nanmedian(relv[m & np.isfinite(M30)])), 1), "240 m": round(float(np.nanmedian(M30[m & np.isfinite(relv)])), 1), "share of cells": round(float((m & np.isfinite(M30) & np.isfinite(relv)).sum() / (m & np.isfinite(relv)).sum()), 3)} for k, m in C30.items()},   # v97: paired (v96 dropped cells of blocks below the fill rule from the 240 m side only)
+         "classes (240 m cells, most of their valid 30 m cells in the class)": {k: round(float(np.nanmedian(M[maj(m)])), 1) for k, m in C30.items()},
          "zones_km2": {t: round(float((M <= t).sum() * 0.0576), 1) for t in cfg["insar"]["zones_mm_yr"]}}
     import geopandas as gpd
     from rasterio.features import geometry_mask
