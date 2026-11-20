@@ -55,6 +55,10 @@ def run(cfg):
     A = {"mineral-soil farmland": per_pass(MIN, ms), "Organic-Soil farmland": per_pass(ORG, ms), "built-up land": per_pass(BU, ms),
          "Hauraki Plains mineral-soil farmland": per_pass(HAU, ms), "mineral-soil farmland within 5 km of Kopuatai": per_pass(LOC, ms)}
     R = {"last pass in study area": str(sorted(df["pass"].unique())[-1]), "segments": {k: int(len(v)) for k, v in (("Organic-Soil farmland", ORG), ("mineral-soil farmland", MIN), ("built-up land", BU), ("Kopuatai bog", BOG))}}
+    # v104: the per-pass series behind Table 6 and Figure 6 (b, c: relative series; d: absolute Organic-Soil and mineral-soil farmland)
+    os.makedirs(f"{out}/plots", exist_ok=True)
+    pd.concat([v.assign(series=k) for k, v in list(S.items()) + [(f"{k} (absolute)", A[k]) for k in ("Organic-Soil farmland", "mineral-soil farmland")]],
+              ignore_index=True).to_parquet(f"{out}/plots/fig6bcd_pass_series.parquet")
     R["relative to mineral-soil farmland"] = {k: fit(v, n_boot=nb) for k, v in S.items()}
     R["Organic-Soil farmland by land cover"] = {k: fit(diff_series(ORG[ORG.wc == c], MIN, ms), n_boot=nb) for k, c in (("grassland", 30), ("cropland", 40))}
     R["absolute"] = {k: fit(v, n_boot=nb) for k, v in A.items()}

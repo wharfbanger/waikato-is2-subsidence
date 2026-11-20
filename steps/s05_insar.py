@@ -55,7 +55,7 @@ def run(cfg):
     tf4326 = from_origin(lon0 - dlon / 2, lat0 - dlat / 2, dlon, -dlat)   # EQA corner is a pixel centre
     with rasterio.open(f"{D}/vel_up.tif", "w", driver="GTiff", height=h, width=w, count=1, dtype="float32", crs="EPSG:4326", transform=tf4326, nodata=np.nan) as o: o.write(vup, 1)
     cop, tf = read(f"{W}/cop30_nzvd2016.tif"); g = np.full(cop.shape, np.nan, np.float32)
-    reproject(vup, g, src_transform=tf4326, src_crs="EPSG:4326", dst_transform=tf, dst_crs="EPSG:2193", resampling=Resampling.average, src_nodata=np.nan, dst_nodata=np.nan)
+    reproject(vup, g, src_transform=tf4326, src_crs="EPSG:4326", dst_transform=tf, dst_crs="EPSG:2193", resampling=Resampling.bilinear, src_nodata=np.nan, dst_nodata=np.nan)   # v104: bilinear (upsampling ~90 x 110 m pixels to 30 m; average gave pixel-block steps)
     m = cfg["masks"]; slope, _ = read(f"{W}/slope_deg.tif"); farmf, _ = read(f"{W}/farmfrac.tif"); near = read(f"{W}/near_organic.tif")[0].astype(bool)
     FARM = (farmf >= m["farmland_fraction_min"]) & (slope < m["slope_max_deg"])
     relv, _ = rel(g, FARM, FARM & ~near, cfg); write(f"{W}/insar_up.tif", g, tf); write(f"{W}/insar_rel.tif", relv, tf)
