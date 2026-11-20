@@ -72,20 +72,29 @@ def max_rates(cfg):
     study = gpd.GeoDataFrame(geometry=[__import__("shapely").geometry.box(a["xmin"], a["ymin"], a["xmax"], a["ymax"])], crs=2193); study.to_file(f"{D}/polys/study.gpkg")
     P = {"Oct 2018 - Jun 2022": ("2018-10-13", "2022-06-30"), "Jul 2022 - Oct 2026": ("2022-07-01", "2026-10-20"), "2018-2026": ("2018-10-13", "2026-10-20")}
     R = {}
+    # v105: zone and band rates with the pipeline's own ICESat-2 code (step 3: pure 3 x 3 farmland, mineral-soil reference, pass-and-DEM residual screen),
+    # as Table 4 and Table 6; was is2rate, which classes land cover at the segment point only. Target: farmland segments inside the polygon;
+    # reference: regional mineral-soil farmland on the same passes, without the target's own segments.
+    import shapely
+    from steps.s03_icesat2_rates import classify
+    from lib.is2 import diff_series, fit
+    rc = cfg["icesat2"]["rates"]; ms = rc["min_segments_per_pass"]
+    df, _ = classify(cfg); F = df[df.land == "farmland"]; MIN = F[(F.order != "Organic") & (F.order != "not mapped") & ~F.near_peat]
+    (a0_, a1_), (u0_, u1_), (v0_, v1_) = rc["periods"]   # decimal-year limits of step 3
+    P2 = {"Oct 2018 - Jun 2022": (u0_, u1_), "Jul 2022 - Oct 2026": (v0_, v1_), "2018-2026": (a0_, a1_), "Jul 2022 - Jul 2026 (sensitivity)": (v0_, 2026.0 + 212 / 365.25)}
+    g30, tf30g = read(f"{cfg['paths']['work']}/grid30/slope_deg.tif")
+    def cell_in(mask, d):
+        r_ = ((tf30g.f - d.Y.values) // 30).astype(int); c_ = ((d.X.values - tf30g.c) // 30).astype(int); ok = (r_ >= 0) & (r_ < mask.shape[0]) & (c_ >= 0) & (c_ < mask.shape[1])
+        o = np.zeros(len(d), bool); o[ok] = mask[r_[ok], c_[ok]]; return o
     for nm, g in T.items():
         gpd.GeoDataFrame(geometry=[g], crs=2193).to_file(f"{D}/polys/{nm}.gpkg"); R[nm] = {"km2": round(g.area / 1e6, 1), "km2_in_study_rectangle": round(g.intersection(study.geometry.iloc[0]).area / 1e6, 1)}
-        for pk, (t0, t1) in P.items():
-            tag = f"{nm}_{t0[:4]}_{t1[:4]}"
-            is2rate(cfg, tag, dict(start=t0, end=t1, seasonal="yes", target_classes="30, 40", ref_classes="30, 40", reference="local",
-                                   ref_area=os.path.abspath(f"{D}/polys/study.gpkg").replace("\\", "/"), target_area=os.path.abspath(f"{D}/polys/{nm}.gpkg").replace("\\", "/"),
-                                   cache_dir=os.path.abspath(f"{D}/cache").replace("\\", "/")), D)
-            j = json.load(open(f"{D}/{tag}_target.json")); R[nm][pk] = dict(rate=j.get("rate"), se=j.get("se_formula", j.get("se")), passes=j.get("n_pass", j.get("passes")))
-        if nm.startswith("insar_le"):   # v99+: 2022-2026 rates rest on ~40 passes; sensitivity to the last passes (Aug-Sep 2026)
-            tag = f"{nm}_2022_2026jul"
-            is2rate(cfg, tag, dict(start="2022-07-01", end="2026-07-31", seasonal="yes", target_classes="30, 40", ref_classes="30, 40", reference="local",
-                                   ref_area=os.path.abspath(f"{D}/polys/study.gpkg").replace("\\", "/"), target_area=os.path.abspath(f"{D}/polys/{nm}.gpkg").replace("\\", "/"),
-                                   cache_dir=os.path.abspath(f"{D}/cache").replace("\\", "/")), D)
-            j = json.load(open(f"{D}/{tag}_target.json")); R[nm]["Jul 2022 - Jul 2026 (sensitivity)"] = dict(rate=j.get("rate"), se=j.get("se_formula", j.get("se")), passes=j.get("n_pass", j.get("passes")))
+        gm = rasterize([(g, 1)], out_shape=g30.shape, transform=tf30g, fill=0, dtype="uint8") > 0   # polygon on the 30 m grid (fast membership)
+        inside = cell_in(gm, F); tgt = F[inside]; ref = MIN[~cell_in(gm, MIN)]
+        R[nm]["target segments"] = int(len(tgt))
+        for pk, (t0, t1) in P2.items():
+            if pk.endswith("(sensitivity)") and not nm.startswith("insar_le"): continue
+            ser = diff_series(tgt, ref, ms); ser = ser[(ser.t >= t0) & (ser.t < t1)]
+            f_ = fit(ser, n_boot=0); R[nm][pk] = dict(rate=f_["rate"], se=f_["se"], passes=f_["passes"]) if f_ else None
         print(nm, R[nm], flush=True)
     W = f"{work}/grid30"; m = cfg["masks"]; slope, tf30 = read(f"{W}/slope_deg.tif"); grass = read(f"{W}/grassfrac.tif")[0]
     near = read(f"{W}/near_organic.tif")[0].astype(bool); orgm = read(f"{W}/organic.tif")[0].astype(bool)
