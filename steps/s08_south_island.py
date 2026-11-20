@@ -35,8 +35,8 @@ def run(cfg):
     for area, A in cfg["south_island"].items():
         df = segments(cfg, area, A); lo0, la0, lo1, la1 = A["town_box"]
         d = df[df.L.notna() & (df.S < cfg["icesat2"]["screening"]["terrain_slope_max_deg"])].copy(); d["r"] = d.H - d.L
-        d = d[(d.r - d.r.median()).abs() < cfg["icesat2"]["screening"]["residual_max_m"]]; town = d.lon.between(lo0, lo1) & d.lat.between(la0, la1)
-        ag = d[d.in_area & d.wc_solid & d.wc.isin(cfg["masks"]["worldcover_farmland"]) & ~town]; bu = d[d.wc_solid & (d.wc == cfg["masks"]["worldcover_builtup"])]
+        d = d[(d.r - d.groupby(["pass", "col"]).r.transform("median")).abs() <= cfg["icesat2"]["screening"]["residual_max_m"]]; town = d.lon.between(lo0, lo1) & d.lat.between(la0, la1)   # v99+: pass and DEM median, as is2rate
+        ag = d[d.in_area & d.wc_solid & d.wc.isin(cfg["masks"]["worldcover_farmland"]) & ~town]; bu = d[d.in_area & d.wc_solid & (d.wc == cfg["masks"]["worldcover_builtup"])]   # v99+: built-up land in the study area, as the Waikato (was anywhere in the tiles, +2 km)
         q = ag.insar; fast = ag[q < -20]
         R[area] = dict(segments_used=len(d), farmland_absolute=fit(per_pass(ag, ms), n_boot=rc["n_boot"]), farmland_minus_built_up=fit(diff_series(ag, bu, mb), n_boot=rc["n_boot"]),
                        InSAR_on_farmland=round(float(np.nanmedian(ag.insar)), 1), InSAR_on_built_up=round(float(np.nanmedian(bu.insar)), 1),

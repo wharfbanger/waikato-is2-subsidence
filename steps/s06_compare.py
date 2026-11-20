@@ -80,6 +80,12 @@ def max_rates(cfg):
                                    ref_area=os.path.abspath(f"{D}/polys/study.gpkg").replace("\\", "/"), target_area=os.path.abspath(f"{D}/polys/{nm}.gpkg").replace("\\", "/"),
                                    cache_dir=os.path.abspath(f"{D}/cache").replace("\\", "/")), D)
             j = json.load(open(f"{D}/{tag}_target.json")); R[nm][pk] = dict(rate=j.get("rate"), se=j.get("se_formula", j.get("se")), passes=j.get("n_pass", j.get("passes")))
+        if nm.startswith("insar_le"):   # v99+: 2022-2026 rates rest on ~40 passes; sensitivity to the last passes (Aug-Sep 2026)
+            tag = f"{nm}_2022_2026jul"
+            is2rate(cfg, tag, dict(start="2022-07-01", end="2026-07-31", seasonal="yes", target_classes="30, 40", ref_classes="30, 40", reference="local",
+                                   ref_area=os.path.abspath(f"{D}/polys/study.gpkg").replace("\\", "/"), target_area=os.path.abspath(f"{D}/polys/{nm}.gpkg").replace("\\", "/"),
+                                   cache_dir=os.path.abspath(f"{D}/cache").replace("\\", "/")), D)
+            j = json.load(open(f"{D}/{tag}_target.json")); R[nm]["Jul 2022 - Jul 2026 (sensitivity)"] = dict(rate=j.get("rate"), se=j.get("se_formula", j.get("se")), passes=j.get("n_pass", j.get("passes")))
         print(nm, R[nm], flush=True)
     W = f"{work}/grid30"; m = cfg["masks"]; slope, tf30 = read(f"{W}/slope_deg.tif"); grass = read(f"{W}/grassfrac.tif")[0]
     near = read(f"{W}/near_organic.tif")[0].astype(bool); orgm = read(f"{W}/organic.tif")[0].astype(bool)

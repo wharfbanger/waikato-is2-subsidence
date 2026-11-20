@@ -126,7 +126,8 @@ def repeat_lidar(cfg):
     R["flights, capture dates of farmland cells (1st-99th percentile, NZDT)"] = {f: [_d(np.percentile(t1[ok & c], 1)), _d(np.percentile(t1[ok & c], 99))] for f, c in FL.items()}
     FA = np.isfinite(dh) & (fa > rl["farm_fraction_min"]) & flat & (np.abs(dh) < 1)
     R["farmland cells between flights (2016 - mid 2017; not used)"] = int((FA & (t1 >= 2016) & (t1 <= 2017.5)).sum())
-    R["farmland cells without a capture date (interval of the collections used; not in same-flight rates)"] = {"cells": int((FA & ~np.isfinite(dt)).sum()), "share": round(float((FA & ~np.isfinite(dt)).sum() / FA.sum()), 3)}
+    R["farmland cells without a capture date (interval of the collections used; not in same-flight rates)"] = {"cells": int((FA & ~np.isfinite(dt)).sum()), "share": round(float((FA & ~np.isfinite(dt)).sum() / FA.sum()), 3),
+        "earlier survey undated": int((FA & ~np.isfinite(t1)).sum()), "2024 survey undated": int((FA & ~np.isfinite(t2)).sum()), "farmland cells (both surveys, slope < 3 deg, |dh| < 1 m)": int(FA.sum())}   # v99+: per survey (checker v99)
     # 10 km squares (bootstrap grid) holding the cells of the bog and of each site (Table 4 note)
     YYc, XXc = np.mgrid[0:sh[0], 0:sh[1]]; Xc = tf.c + (XXc + .5) * RS; Yc = tf.f - (YYc + .5) * RS; bx0, by0 = cfg["grids"]["square_origin"]; Gb = cfg["maps"]["block_bootstrap_km"] * 1000
     sq = ((Xc - bx0) // Gb).astype(np.int64) * 100000 + ((Yc - by0) // Gb).astype(np.int64)

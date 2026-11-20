@@ -16,9 +16,9 @@ def classify(cfg):
     df["L"] = np.where(u24, df.L2024, df.L2021); df["S"] = np.where(u24, df.S2024, df.S2021); df["col"] = np.where(u24, "2024", "2021")
     df = df[df.L.notna() & (df.S < q["terrain_slope_max_deg"]) & df.X.between(a["xmin"], a["xmax"], inclusive="left") & df.Y.between(a["ymin"], a["ymax"], inclusive="left")].copy()
     df["r"] = df.H - df.L
+    df = df[(df.r - df.groupby(["pass", "col"]).r.transform("median")).abs() <= q["residual_max_m"]].copy()   # v99+: within 0.5 m of the median of its pass and DEM (all land), as is2rate; was the record-wide farmland median
     farm = df.wc_solid & df.wc.isin(FARM); built = df.wc_solid & (df.wc == BUILT); wet = df.wc == WET
     df = df[farm | built | wet].copy(); df["land"] = np.select([df.wc == WET, df.wc == BUILT], ["natural wetland", "built-up"], "farmland")
-    df = df[(df.r - df.r[df.land == "farmland"].median()).abs() < q["residual_max_m"]].copy()   # residuals within 0.5 m of the regional (farmland) median
     sm = gpd.read_file(f"{raw}/soils/smap_soilorder_waikato.gpkg")[["NZSCOrder", "geometry"]]
     j = gpd.sjoin(gpd.GeoDataFrame(df[["X"]], geometry=gpd.points_from_xy(df.X, df.Y), crs=2193), sm, how="left", predicate="within"); j = j[~j.index.duplicated()]
     df["order"] = j.NZSCOrder.fillna("not mapped").values
