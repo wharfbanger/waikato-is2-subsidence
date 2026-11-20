@@ -92,7 +92,9 @@ def repeat_lidar(cfg):
     for nm, a in (("repeat_dh", dh), ("repeat_rate", rate), ("capture_earlier", t1), ("capture_later", t2)): write(f"{work}/repeat/{nm}_{RS}m.tif", a, tf, float(RS))
     R = {"cells_differenced": int(np.isfinite(dh).sum()), "area_km2": round(float(np.isfinite(dh).sum() * (RS / 1000) ** 2), 0)}
     # (1) same campaign: Organic-Soil farmland minus mineral-soil farmland flown at the same time; untied, no ICESat-2
-    ok = np.isfinite(dh) & (fa > rl["farm_fraction_min"]) & (np.abs(dh) < 1) & np.isfinite(dt) & (dt > 4); P, MIN = ok & peat, ok & ~near
+    slo = read(f"{cfg['paths']['work']}/grid30/slope_deg.tif")[0] if RS == 30 else np.zeros(sh, np.float32); assert slo.shape == sh
+    flat = slo < cfg["masks"]["slope_max_deg"]   # v99: farmland cell as Table S1 (slope < 3 deg, Copernicus DEM), as the tied rates and the maps; before, no slope test here
+    ok = np.isfinite(dh) & (fa > rl["farm_fraction_min"]) & flat & (np.abs(dh) < 1) & np.isfinite(dt) & (dt > 4); P, MIN = ok & peat, ok & ~near
     CAP = {"Feb 2015": t1 < 2016, "Dec 2017 - Mar 2018": t1 > 2017.5}
     SITES = {"northern Torehape": (P & body["Torehape"], "Feb 2015"), "southern Torehape": (P & body["Torehape"], "Dec 2017 - Mar 2018"),
              "drained margins of Kopuatai": (P & body["Kopuatai"], "Dec 2017 - Mar 2018")}
@@ -122,7 +124,7 @@ def repeat_lidar(cfg):
     # v97: capture dates of each flight (farmland cells used; 1st-99th percentile), cells between flights, and farmland cells without a date
     def _d(y): return str((np.datetime64("1970-01-01T00:00:00", "s") + np.timedelta64(int((float(y) - 1970) * 365.2425 * 86400 + 13 * 3600), "s")).astype("datetime64[D]"))   # inverse of lib/repeat.py decimal year; NZ daylight time (UTC+13)
     R["flights, capture dates of farmland cells (1st-99th percentile, NZDT)"] = {f: [_d(np.percentile(t1[ok & c], 1)), _d(np.percentile(t1[ok & c], 99))] for f, c in FL.items()}
-    FA = np.isfinite(dh) & (fa > rl["farm_fraction_min"]) & (np.abs(dh) < 1)
+    FA = np.isfinite(dh) & (fa > rl["farm_fraction_min"]) & flat & (np.abs(dh) < 1)
     R["farmland cells between flights (2016 - mid 2017; not used)"] = int((FA & (t1 >= 2016) & (t1 <= 2017.5)).sum())
     R["farmland cells without a capture date (interval of the collections used; not in same-flight rates)"] = {"cells": int((FA & ~np.isfinite(dt)).sum()), "share": round(float((FA & ~np.isfinite(dt)).sum() / FA.sum()), 3)}
     # 10 km squares (bootstrap grid) holding the cells of the bog and of each site (Table 4 note)

@@ -11,6 +11,7 @@ from lib.is2 import per_pass, fit, diff_series
 def segments(cfg, area, A):
     raw, work = cfg["paths"]["raw"], cfg["paths"]["work"]; S = f"{work}/segments_{area}.parquet"; q = cfg["icesat2"]["screening"]
     if os.path.exists(S): return pd.read_parquet(S)
+    from steps.s02_icesat2 import fetch; fetch(cfg, raw, [(area, f"{area}.shp")])   # v99: download in 2-month windows if not cached
     pyproj.datadir.append_data_dir(os.path.abspath(f"{raw}/proj")); TR = pyproj.Transformer.from_crs("EPSG:4979", "EPSG:2193+7839", always_xy=True); fr = []
     for f in sorted(glob.glob(f"{raw}/icesat2/{area}_??_atl06sr.parquet")):
         g = gpd.read_parquet(f); g = g[(g.n_fit_photons >= q["n_photons_min"]) & (g.h_sigma < q["h_sigma_max"]) & (g.dh_fit_dx.abs() < q["dh_fit_dx_max"]) & (g.w_surface_window_final < q["w_surface_window_max"])]

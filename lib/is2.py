@@ -100,5 +100,6 @@ def separate_difference(pp, t_break, n_boot=2000, seed=5):
     for _ in range(n_boot):
         p = pp.iloc[np.concatenate([grp[x] for x in rng.choice(passes, len(passes))])]
         if (p.t < t_break).sum() > 5 and (p.t >= t_break).sum() > 5: bs.append(one(p))
+    if not n_boot: return dict(before_minus_after=round(float(d0), 1))
     return dict(before_minus_after=round(float(d0), 1), CI=[round(float(np.percentile(bs, 2.5)), 1), round(float(np.percentile(bs, 97.5)), 1)],
                 n_boot=n_boot, dropped_share=round(1 - len(bs) / n_boot, 3))   # v98: dropped = a period with five or fewer pass-DEM values, repeats counted

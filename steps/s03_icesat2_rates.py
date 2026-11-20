@@ -8,10 +8,11 @@ FARM, BUILT, WET = (30, 40), 50, 90
 
 
 def classify(cfg):
-    """Residual against the 2024 LiDAR where it has a usable height (slope < 2 deg), else the 2021 LiDAR; screening; land and soil labels."""
+    """Residual against the 2024 LiDAR where it has a height, else the 2021 LiDAR; then the slope test on that DEM (as is2rate and Table S1); screening; land and soil labels.
+    v99: before, a segment steep (>= 2 deg) in the 2024 LiDAR fell back to the 2021 LiDAR (drains/earthworks dug after 2021 compared with the earlier surface)."""
     raw, work = cfg["paths"]["raw"], cfg["paths"]["work"]; a = cfg["study_area"]; q = cfg["icesat2"]["screening"]
     df = pd.read_parquet(f"{work}/segments.parquet")
-    u24 = df.L2024.notna() & (df.S2024 < q["terrain_slope_max_deg"])
+    u24 = df.L2024.notna()
     df["L"] = np.where(u24, df.L2024, df.L2021); df["S"] = np.where(u24, df.S2024, df.S2021); df["col"] = np.where(u24, "2024", "2021")
     df = df[df.L.notna() & (df.S < q["terrain_slope_max_deg"]) & df.X.between(a["xmin"], a["xmax"], inclusive="left") & df.Y.between(a["ymin"], a["ymax"], inclusive="left")].copy()
     df["r"] = df.H - df.L
@@ -64,6 +65,10 @@ def run(cfg):
     R["segmented"] = {k: segmented(v, rc["break_date"], n_boot=nb6) for k, v in S.items()}
     R["seasonal amplitude"] = {k: amplitude(A[k], rc["n_boot_amplitude"]) for k in ("Organic-Soil farmland", "mineral-soil farmland")}
     R["separate fits, before minus after"] = {k: separate_difference(v, rc["break_date"], n_boot=nb6) for k, v in S.items()}
+    # v99: leave-one-pass-out range of the separate-fit change (it rests near zero and on single passes; checker v98: one pass with 12 target segments moved it 2 mm/yr)
+    for k, v in S.items():
+        jk = [separate_difference(v[v["pass"] != q], rc["break_date"], n_boot=0)["before_minus_after"] for q in v["pass"].unique()]
+        R["separate fits, before minus after"][k]["leave_one_pass_out"] = [round(-max(jk), 1), round(-min(jk), 1)]   # as after - before
     LOC3 = MIN[gpd.GeoSeries(gpd.points_from_xy(MIN.X, MIN.Y), crs=2193).within(kp.buffer(3000)).values]
     R["Kopuatai bog, reference within 3 km"] = fit(diff_series(BOG, LOC3, ms), n_boot=0)
     R["Organic-Soil farmland without annual cycle"] = fit(S["Organic-Soil farmland"], n_boot=0, seasonal=False)

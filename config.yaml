@@ -60,6 +60,9 @@ icesat2:
     sigma_r_max: 5
     t0: "2018-10-13"
     t1: "2026-10-20"
+    months_per_request: 6   # v99: whole-record requests were cut at ~300 granules
+    retries_per_window: 4   # retry a window while the failing granules change; same set twice = persistent, recorded
+    timeout_s: 3000
   screening:
     n_photons_min: 10
     h_sigma_max: 0.15
