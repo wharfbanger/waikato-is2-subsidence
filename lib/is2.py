@@ -60,35 +60,6 @@ def diff_trend(target, ref, min_seg=10, **k): return fit(diff_series(target, ref
 def period(pp, t0, t1): return pp[(pp["t"] >= t0) & (pp["t"] < t1)]
 
 
-def segmented(pp, t_break, n_boot=2000, seed=5):
-    """Shared DEM constants and annual cycle, separate slopes before and after t_break, and a step at it.
-    95% CIs of the two rates, their difference and the step from a bootstrap of whole passes."""
-    def one(p):
-        A, k = design(p, t_break); b = np.linalg.lstsq(A, p["r"].values, rcond=None)[0]; return b[k] * 1000, (b[k] + b[-2]) * 1000, b[-1] * 1000
-    A, k = design(pp, t_break); b0, a0, s0 = one(pp)
-    passes = pp["pass"].unique(); rng = np.random.default_rng(seed); grp = {p: np.flatnonzero(pp["pass"].values == p) for p in passes}; bs = []
-    for _ in range(n_boot):
-        p = pp.iloc[np.concatenate([grp[x] for x in rng.choice(passes, len(passes))])]
-        if design(p, t_break)[0].shape[1] != A.shape[1]: continue
-        bs.append(one(p))
-    bs = np.array(bs); ci = lambda v: [round(float(np.percentile(v, 2.5)), 1), round(float(np.percentile(v, 97.5)), 1)]
-    return dict(before=round(float(b0), 1), before_CI=ci(bs[:, 0]), after=round(float(a0), 1), after_CI=ci(bs[:, 1]), after_minus_before=round(float(a0 - b0), 1),
-                diff_CI=ci(bs[:, 1] - bs[:, 0]), step_mm=round(float(s0), 1), step_CI=ci(bs[:, 2]), passes=int(len(passes)),
-                n_boot=n_boot, dropped_share=round(1 - len(bs) / n_boot, 3))   # v98: dropped = resample lacks a DEM of the full fit
-
-
-def amplitude(pp, n_boot=500, seed=3):
-    """Seasonal amplitude (mm): half the peak-to-trough range of the fitted sinusoid, with a 95% CI from resampled whole passes."""
-    def amp(p):
-        A, k = design(p); b = np.linalg.lstsq(A, p["r"].values, rcond=None)[0]; return float(np.hypot(b[k + 1], b[k + 2])) * 1000
-    a = amp(pp); passes = pp["pass"].unique(); rng = np.random.default_rng(seed); grp = {p: np.flatnonzero(pp["pass"].values == p) for p in passes}
-    ncol = design(pp)[0].shape[1]; bs = []
-    for _ in range(n_boot):
-        p = pp.iloc[np.concatenate([grp[x] for x in rng.choice(passes, len(passes))])]
-        if design(p)[0].shape[1] == ncol: bs.append(amp(p))
-    return dict(amplitude_mm=round(a, 1), ci=[round(float(np.percentile(bs, 2.5)), 1), round(float(np.percentile(bs, 97.5)), 1)])
-
-
 def separate_difference(pp, t_break, n_boot=2000, seed=5):
     """Rate before minus rate after t_break, each period fitted separately (own DEM constants and annual cycle); 95% CI from a bootstrap of whole passes."""
     def one(p):

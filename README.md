@@ -13,7 +13,7 @@ All parameters are in `config.yaml`; put machine-specific paths (LiDAR tiles, po
 |---|---|---|
 | 1 | `steps/s01_prepare.py` | LINZ 1 m LiDAR tiles, 30 m grids, Copernicus to NZVD2016, WorldCover and S-map masks, LiDAR mosaics |
 | 2 | `steps/s02_icesat2.py` | SlideRule ATL06-SR segments, screening, NZVD2016 heights, labels, LiDAR heights |
-| 3 | `steps/s03_icesat2_rates.py` | Per-pass target minus reference, trends, periods, segmented fit, seasonal amplitude, LiDAR survey bias |
+| 3 | `steps/s03_icesat2_rates.py` | Per-pass target minus reference, trends, periods, change of rate at July 2022, LiDAR survey bias |
 | 4 | `steps/s04_dem_rates.py` | LiDAR − Copernicus; repeat LiDAR (capture dates from point clouds, same-campaign rates, tie to ICESat-2) |
 | 5 | `steps/s05_insar.py` | LiCSBAS (WSL) velocity, vertical, local reference, 240 m map, zones (no noise mask, for reproducibility) |
 | 6 | `steps/s06_compare.py` | Hexagons and maximum rates with is2rate; map hexagons; comparisons |

@@ -2,7 +2,7 @@
 (a) ICESat-2 hexagon rates with is2rate (3 km, regional seasonal cycle), from the step-2 SlideRule download and the step-1 LiDAR mosaics;
 (b) LiDAR - Copernicus and InSAR on the same hexagons: median of at least 30 referenced 30 m farmland cells; hexagons at least 25% farmland;
     Pearson r with the ICESat-2 hexagon rates;
-(c) maximum rates with is2rate: distance bands inside Organic Soils and InSAR zones, three periods (Table 4).
+(c) maximum rates: InSAR zones, three periods, with their distance inside Organic Soils and LiDAR - Copernicus median (Table 5).
 Outputs: outputs/maps/hex_3km.gpkg, outputs/tables/hexagons.json, outputs/tables/max_rates.json."""
 import glob, json, os, subprocess, sys, numpy as np, pandas as pd, geopandas as gpd, rasterio
 from rasterio.features import rasterize
@@ -56,16 +56,14 @@ def run(cfg):
 
 
 def max_rates(cfg):
-    """Table 4: ICESat-2 rate of each subset (one target, regional mineral-soil reference on the same passes) per period, with is2rate;
-    InSAR map median of each zone; LiDAR - Copernicus median of the referenced 30 m farmland cells of each band."""
+    """Table 5: ICESat-2 rate of each InSAR zone (one target, regional mineral-soil reference on the same passes) per period;
+    InSAR map median, LiDAR - Copernicus median, share on Organic Soils and distance inside the S-map boundary of the zone's 30 m farmland cells.
+    v107: distance bands removed (user decision, 22 Nov 2026); the zones carry the interior result, with their distance inside Organic Soils."""
     from rasterio.features import shapes, geometry_mask
     from shapely.geometry import shape
     from lib.maps import ref_adapt
     work, out, raw = cfg["paths"]["work"], cfg["paths"]["out"], cfg["paths"]["raw"]; D = f"{work}/is2rate/max"; os.makedirs(f"{D}/polys", exist_ok=True); a = cfg["study_area"]
     org = gpd.read_file(f"{raw}/soils/smap_organic_waikato.shp").to_crs(2193).unary_union.buffer(0); T = {}
-    E = cfg["max_rates"]["distance_bands_m"]
-    for lo, hi in zip(E[:-1], E[1:]):
-        g = org.buffer(-lo).difference(org.buffer(-hi)) if lo > 0 else org.difference(org.buffer(-hi)); T[f"band_{lo}_{hi}"] = g
     with rasterio.open(f"{out}/maps/insar_rel_240m.tif") as d: I = d.read(1); tf = d.transform
     for t in cfg["insar"]["zones_mm_yr"]:
         m = np.isfinite(I) & (I <= t); T[f"insar_le_{-t}"] = gpd.GeoSeries([shape(s) for s, v in shapes(m.astype("uint8"), mask=m, transform=tf) if v == 1], crs=2193).unary_union
@@ -92,7 +90,6 @@ def max_rates(cfg):
         inside = cell_in(gm, F); tgt = F[inside]; ref = MIN[~cell_in(gm, MIN)]
         R[nm]["target segments"] = int(len(tgt))
         for pk, (t0, t1) in P2.items():
-            if pk.endswith("(sensitivity)") and not nm.startswith("insar_le"): continue
             ser = diff_series(tgt, ref, ms); ser = ser[(ser.t >= t0) & (ser.t < t1)]
             f_ = fit(ser, n_boot=0); R[nm][pk] = dict(rate=f_["rate"], se=f_["se"], passes=f_["passes"]) if f_ else None
         print(nm, R[nm], flush=True)
@@ -100,11 +97,16 @@ def max_rates(cfg):
     near = read(f"{W}/near_organic.tif")[0].astype(bool); orgm = read(f"{W}/organic.tif")[0].astype(bool)
     PAST = (read(f"{W}/farmfrac.tif")[0] >= m["farmland_fraction_min"]) & (slope < m["slope_max_deg"]); C = read(f"{W}/lidcop_rate.tif")[0]; cap = cfg["maps"]["ref_cap_mm_yr"]   # farmland
     ref = ref_adapt(C, PAST & ~near, cfg); ok = PAST & orgm & np.isfinite(C) & (np.abs(C) < cap) & np.isfinite(ref); relc = C - ref
+    from scipy.ndimage import distance_transform_edt
+    dist_in = distance_transform_edt(orgm) * 30.0   # distance of an Organic Soil cell to the S-map boundary (m)
+    okc = PAST & np.isfinite(C) & (np.abs(C) < cap) & np.isfinite(ref)
+    R["Organic-Soil farmland, median distance inside Organic Soils (m)"] = round(float(np.median(dist_in[PAST & orgm])), -1)   # baseline for the zones
     for nm, g in T.items():
-        if nm.startswith("band"):
-            mk = ~geometry_mask([g], C.shape, tf30); R[nm]["LiDAR - Copernicus median"] = round(float(np.median(relc[mk & ok])), 1)
-        else: R[nm]["InSAR map median"] = round(float(np.nanmedian(I[np.isfinite(I) & (I <= -int(nm.split('_')[-1]))])), 1)
-    R["Organic Soils more than 3 km inside (km2 in study rectangle)"] = round(org.buffer(-3000).intersection(study.geometry.iloc[0]).area / 1e6, 1)
+        mk = rasterize([(g, 1)], out_shape=C.shape, transform=tf30, fill=0, dtype="uint8") > 0; fz = mk & PAST   # zone farmland cells (cell centre inside)
+        R[nm]["InSAR map median"] = round(float(np.nanmedian(I[np.isfinite(I) & (I <= -int(nm.split('_')[-1]))])), 1)
+        R[nm]["LiDAR - Copernicus median"] = round(float(np.median(relc[mk & okc])), 1)
+        R[nm]["farmland share on Organic Soils"] = round(float(orgm[fz].mean()), 3)
+        R[nm]["median distance inside Organic Soils (m), Organic farmland cells"] = round(float(np.median(dist_in[fz & orgm])), -1)
     json.dump(R, open(f"{out}/tables/max_rates.json", "w"), indent=1)
 
 

@@ -63,8 +63,7 @@ def run(cfg):
     # class values: 240 m map at the ICESat-2 segment locations of each class (one value per location)
     S = pd.read_parquet(f"{work}/segments_classified.parquet").drop_duplicates(subset=["X", "Y"])
     F = S[S.land == "farmland"]; MIN = F[(F.order != "Organic") & (F.order != "not mapped") & ~F.near_peat]; hx0, hy0, hx1, hy1 = a["hauraki_box"]
-    CL = {"Organic-Soil farmland": F[F.order == "Organic"], "mineral-soil farmland": MIN, "Hauraki Plains mineral-soil farmland": MIN[MIN.X.between(hx0, hx1) & MIN.Y.between(hy0, hy1)],
-          "Kopuatai bog": S[(S.land == "natural wetland") & (S.order == "Organic") & (S.body == "Kopuatai")]}
+    CL = {"Organic-Soil farmland": F[F.order == "Organic"], "mineral-soil farmland": MIN, "Hauraki Plains mineral-soil farmland": MIN[MIN.X.between(hx0, hx1) & MIN.Y.between(hy0, hy1)]}
     def samp(arr, d, res):
         r_ = ((tf.f - d.Y.values) // res).astype(int); c_ = ((d.X.values - tf.c) // res).astype(int); ok = (r_ >= 0) & (r_ < arr.shape[0]) & (c_ >= 0) & (c_ < arr.shape[1])
         v = np.full(len(d), np.nan); v[ok] = arr[r_[ok], c_[ok]]; return round(float(np.nanmedian(v)), 1)
@@ -92,12 +91,6 @@ def run(cfg):
     import geopandas as gpd
     from rasterio.features import geometry_mask
     from lib.maps import ref_adapt
-    bod = gpd.read_file(f"{cfg['paths']['raw']}/soils/Waikato_peat_bodies_stats.gpkg").to_crs(2193); kb = ~geometry_mask(bod[bod["name"] == "Kopuatai"].geometry, g.shape, tf)
-    wet = (read(f"{W}/wetfrac.tif")[0] > 0.9) & kb & np.isfinite(g); insw = g - ref_adapt(g, FARM & ~near, cfg)
-    R["Kopuatai bog (natural wetland cells, relative to mineral-soil farmland)"] = round(float(np.nanmedian(insw[wet])), 1)
-    bid = block_id(g.shape, tf, G, cfg["grids"]["square_origin"])   # v96: 10 km squares holding the bog cells (Table 4 note)
-    u_, c_ = np.unique(bid[wet], return_counts=True); c_ = np.sort(c_)[::-1]
-    R["Kopuatai bog, 10 km squares"] = dict(squares=int(u_.size), share_of_two_largest=round(float(c_[:2].sum() / c_.sum()), 2))
     # Section 5.2: unreferenced InSAR at mineral-soil farmland segments minus built-up land within 3 km of Cambridge
     lo, la = cfg["insar"]["cambridge_centre"]; import pyproj
     cx, cy = pyproj.Transformer.from_crs(4326, 2193, always_xy=True).transform(lo, la)

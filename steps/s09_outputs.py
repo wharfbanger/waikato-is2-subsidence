@@ -23,8 +23,7 @@ def run(cfg):
     se = lambda d: f"{d['rate']:+.1f} ± {d['se']:.1f}".replace("-", "−")
     T3 = pd.DataFrame([["Organic-Soil farmland", se(rel["Organic-Soil farmland"]), ic["Organic-Soil farmland"], lc["median_rel"], tc["Organic-Soil farmland"]["median"]],
                        ["Mineral-soil farmland", "reference", ic["mineral-soil farmland"], "reference", tc["mineral-soil farmland"]["median"]],
-                       ["Hauraki Plains mineral-soil farmland", "–", ic["Hauraki Plains mineral-soil farmland"], "–", tc["Hauraki Plains mineral-soil farmland"]["median"]],
-                       ["Kopuatai natural bog", se(rel["Kopuatai bog"]), IN["Kopuatai bog (natural wetland cells, relative to mineral-soil farmland)"], "–", tc["Kopuatai bog"]["median"]]],
+                       ["Hauraki Plains mineral-soil farmland", "–", ic["Hauraki Plains mineral-soil farmland"], "–", tc["Hauraki Plains mineral-soil farmland"]["median"]]],
                       columns=["Land class", "ICESat-2", "InSAR", "LiDAR − Copernicus", "Repeat LiDAR, tied"])
     rows = []
     for k, v in MX.items():

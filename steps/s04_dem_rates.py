@@ -128,7 +128,7 @@ def repeat_lidar(cfg):
     R["farmland cells between flights (2016 - mid 2017; not used)"] = int((FA & (t1 >= 2016) & (t1 <= 2017.5)).sum())
     R["farmland cells without a capture date (interval of the collections used; not in same-flight rates)"] = {"cells": int((FA & ~np.isfinite(dt)).sum()), "share": round(float((FA & ~np.isfinite(dt)).sum() / FA.sum()), 3),
         "earlier survey undated": int((FA & ~np.isfinite(t1)).sum()), "2024 survey undated": int((FA & ~np.isfinite(t2)).sum()), "farmland cells (both surveys, slope < 3 deg, |dh| < 1 m)": int(FA.sum())}   # v99+: per survey (checker v99)
-    # 10 km squares (bootstrap grid) holding the cells of the bog and of each site (Table 4 note)
+    # 10 km squares (bootstrap grid) holding the cells of each site (Table 4 note)
     YYc, XXc = np.mgrid[0:sh[0], 0:sh[1]]; Xc = tf.c + (XXc + .5) * RS; Yc = tf.f - (YYc + .5) * RS; bx0, by0 = cfg["grids"]["square_origin"]; Gb = cfg["maps"]["block_bootstrap_km"] * 1000
     sq = ((Xc - bx0) // Gb).astype(np.int64) * 100000 + ((Yc - by0) // Gb).astype(np.int64)
     def nsq(m):
@@ -146,8 +146,7 @@ def repeat_lidar(cfg):
         adj[~np.isfinite(adj)] = np.median(rate[npk]) - TIE; return rate - adj, n
     S = pd.read_parquet(f"{work}/segments_classified.parquet").drop_duplicates(subset=["X", "Y"]); a = cfg["study_area"]
     F = S[S.land == "farmland"]; MINs = F[(F.order != "Organic") & (F.order != "not mapped") & ~F.near_peat]; hx0, hy0, hx1, hy1 = a["hauraki_box"]
-    CL = {"Organic-Soil farmland": F[F.order == "Organic"], "mineral-soil farmland": MINs, "Hauraki Plains mineral-soil farmland": MINs[MINs.X.between(hx0, hx1) & MINs.Y.between(hy0, hy1)],
-          "Kopuatai bog": S[(S.land == "natural wetland") & (S.order == "Organic") & (S.body == "Kopuatai")]}
+    CL = {"Organic-Soil farmland": F[F.order == "Organic"], "mineral-soil farmland": MINs, "Hauraki Plains mineral-soil farmland": MINs[MINs.X.between(hx0, hx1) & MINs.Y.between(hy0, hy1)]}
     def samp(t, d):
         r_ = ((tf.f - d.Y.values) // RS).astype(int); c_ = ((d.X.values - tf.c) // RS).astype(int); ok_ = (r_ >= 0) & (r_ < sh[0]) & (c_ >= 0) & (c_ < sh[1])
         v = np.full(len(d), np.nan); v[ok_] = t[r_[ok_], c_[ok_]]; v = v[np.isfinite(v)]; return round(float(np.median(v)), 1), int(v.size)

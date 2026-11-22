@@ -75,10 +75,8 @@ icesat2:
     min_passes: 8
     periods: [[2018.78, 2026.80], [2018.78, 2022.5], [2022.5, 2026.80]]
     break_date: 2022.5
-    bog_reference_km: 5
     n_boot: 2000
-    n_boot_table6: 20000   # segmented fit and separate-fit change (Table 6)
-    n_boot_amplitude: 500
+    n_boot_change: 20000   # CI of the change of rate between the periods (Section 4.4)
   survey_bias:
     date_2021: 2021.14     # 22 February 2021
     date_2024: 2024.24
@@ -125,7 +123,7 @@ hexagons:
   n_boot: 300
 
 max_rates:
-  distance_bands_m: [0, 250, 500, 1000, 1500, 2000, 3000]
+  # distance_bands_m removed in v107 (bands dropped; the InSAR zones report their distance inside Organic Soils)
 
 sensitivity:
   buffers_m: [250, 500, 1000, 2000]

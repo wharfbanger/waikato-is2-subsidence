@@ -1,8 +1,9 @@
 """Step 3 (Table S1): ICESat-2 rates of land classes, and the survey bias of the 2021 LiDAR.
 Input: data/work/segments.parquet (step 2). Outputs: data/work/segments_classified.parquet, outputs/tables/icesat2_rates.json and
-icesat2_rates.xlsx, outputs/plots/fig6_series.xlsx, data/work/bias2021_10km.csv."""
+data/work/bias2021_10km.csv.
+v108: Kopuatai bog, segmented fit, seasonal amplitude and the Figure 6b-d series removed (paper v108)."""
 import json, os, numpy as np, pandas as pd, geopandas as gpd
-from lib.is2 import per_pass, fit, diff_series, design, segmented, amplitude, separate_difference
+from lib.is2 import per_pass, fit, diff_series, separate_difference
 
 FARM, BUILT, WET = (30, 40), 50, 90
 
@@ -48,42 +49,28 @@ def run(cfg):
     F = df[df.land == "farmland"]; ORG = F[F.order == "Organic"]; MIN = F[(F.order != "Organic") & (F.order != "not mapped") & ~F.near_peat]
     BU = df[df.land == "built-up"]
     hx0, hy0, hx1, hy1 = a["hauraki_box"]; HAU = MIN[MIN.X.between(hx0, hx1) & MIN.Y.between(hy0, hy1)]
-    kp = bodies.geometry.iloc[int(bodies.index[bodies.name == "Kopuatai"][0])]
-    BOG = df[(df.land == "natural wetland") & (df.order == "Organic") & (df.body == "Kopuatai")]
-    LOC = MIN[gpd.GeoSeries(gpd.points_from_xy(MIN.X, MIN.Y), crs=2193).within(kp.buffer(rc["bog_reference_km"] * 1000)).values]
-    S = {"Organic-Soil farmland": diff_series(ORG, MIN, ms), "Kopuatai bog": diff_series(BOG, LOC, ms)}
+    S = {"Organic-Soil farmland": diff_series(ORG, MIN, ms)}
     A = {"mineral-soil farmland": per_pass(MIN, ms), "Organic-Soil farmland": per_pass(ORG, ms), "built-up land": per_pass(BU, ms),
-         "Hauraki Plains mineral-soil farmland": per_pass(HAU, ms), "mineral-soil farmland within 5 km of Kopuatai": per_pass(LOC, ms)}
-    R = {"last pass in study area": str(sorted(df["pass"].unique())[-1]), "segments": {k: int(len(v)) for k, v in (("Organic-Soil farmland", ORG), ("mineral-soil farmland", MIN), ("built-up land", BU), ("Kopuatai bog", BOG))}}
-    # v104: the per-pass series behind Table 6 and Figure 6 (b, c: relative series; d: absolute Organic-Soil and mineral-soil farmland)
-    os.makedirs(f"{out}/plots", exist_ok=True)
-    pd.concat([v.assign(series=k) for k, v in list(S.items()) + [(f"{k} (absolute)", A[k]) for k in ("Organic-Soil farmland", "mineral-soil farmland")]],
-              ignore_index=True).to_parquet(f"{out}/plots/fig6bcd_pass_series.parquet")
+         "Hauraki Plains mineral-soil farmland": per_pass(HAU, ms)}
+    R = {"last pass in study area": str(sorted(df["pass"].unique())[-1]), "segments": {k: int(len(v)) for k, v in (("Organic-Soil farmland", ORG), ("mineral-soil farmland", MIN), ("built-up land", BU))}}
     R["relative to mineral-soil farmland"] = {k: fit(v, n_boot=nb) for k, v in S.items()}
     R["Organic-Soil farmland by land cover"] = {k: fit(diff_series(ORG[ORG.wc == c], MIN, ms), n_boot=nb) for k, c in (("grassland", 30), ("cropland", 40))}
     R["absolute"] = {k: fit(v, n_boot=nb) for k, v in A.items()}
     R["relative to built-up land"] = {k: fit(diff_series(g, BU, ms), n_boot=nb) for k, g in (("mineral-soil farmland", MIN), ("Hauraki Plains mineral-soil farmland", HAU))}
     (t0, t1), (u0, u1), (v0, v1) = rc["periods"]
     R["periods"] = {k: {"Oct 2018 - Jun 2022": fit(v[(v.t >= u0) & (v.t < u1)], n_boot=nb), "Jul 2022 - Oct 2026": fit(v[(v.t >= v0) & (v.t < v1)], n_boot=nb)} for k, v in S.items()}
-    nb6 = rc["n_boot_table6"]   # v98: Table 6 CIs from 20,000 resamples (bog CIs seed-sensitive at 2,000)
-    R["segmented"] = {k: segmented(v, rc["break_date"], n_boot=nb6) for k, v in S.items()}
-    R["seasonal amplitude"] = {k: amplitude(A[k], rc["n_boot_amplitude"]) for k in ("Organic-Soil farmland", "mineral-soil farmland")}
+    nb6 = rc["n_boot_change"]   # CI of the change of rate between the periods (Section 4.4) from 20,000 resamples
     R["separate fits, before minus after"] = {k: separate_difference(v, rc["break_date"], n_boot=nb6) for k, v in S.items()}
     # v99: leave-one-pass-out range of the separate-fit change (it rests near zero and on single passes; checker v98: one pass with 12 target segments moved it 2 mm/yr)
     for k, v in S.items():
         jk = [separate_difference(v[v["pass"] != q], rc["break_date"], n_boot=0)["before_minus_after"] for q in v["pass"].unique()]
         R["separate fits, before minus after"][k]["leave_one_pass_out"] = [round(-max(jk), 1), round(-min(jk), 1)]   # as after - before
-    LOC3 = MIN[gpd.GeoSeries(gpd.points_from_xy(MIN.X, MIN.Y), crs=2193).within(kp.buffer(3000)).values]
-    R["Kopuatai bog, reference within 3 km"] = fit(diff_series(BOG, LOC3, ms), n_boot=0)
     R["Organic-Soil farmland without annual cycle"] = fit(S["Organic-Soil farmland"], n_boot=0, seasonal=False)
     rat = {o: fit(diff_series(F[F.order == o], MIN, ms), n_boot=nb) for o in F.order.unique() if o != "not mapped" and (F.order == o).sum() >= 300}
-    rat["Kopuatai bog"] = R["relative to mineral-soil farmland"]["Kopuatai bog"]
     rr = {k: round(v["se"] / v["boot_se"], 2) for k, v in rat.items() if v}
-    R["SE ratio formula/bootstrap (soil orders and bog, 2018-2026)"] = dict(ratios=rr, median=round(float(np.median(list(rr.values()))), 2), min=min(rr.values()), max=max(rr.values()))
+    R["SE ratio formula/bootstrap (soil orders, 2018-2026)"] = dict(ratios=rr, median=round(float(np.median(list(rr.values()))), 2), min=min(rr.values()), max=max(rr.values()))
     seg = pd.read_parquet(f"{work}/segments.parquet", columns=["X", "Y"])
     R["segments after screening in the study area"] = int((seg.X.between(a["xmin"], a["xmax"], inclusive="left") & seg.Y.between(a["ymin"], a["ymax"], inclusive="left")).sum())
     R["survey bias"] = survey_bias(cfg, pd.read_parquet(f"{work}/segments.parquet"))
     json.dump(R, open(f"{out}/tables/icesat2_rates.json", "w"), indent=1)
-    with pd.ExcelWriter(f"{out}/plots/fig6_series.xlsx") as xw:
-        for k, v in {**S, **{f"abs {k}": A[k] for k in ("Organic-Soil farmland", "mineral-soil farmland")}}.items(): v.to_excel(xw, sheet_name=k[:31], index=False)
     print(json.dumps(R, indent=1), flush=True)
