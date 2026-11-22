@@ -96,8 +96,8 @@ def repeat_lidar(cfg):
     flat = slo < cfg["masks"]["slope_max_deg"]   # v99: farmland cell as Table S1 (slope < 3 deg, Copernicus DEM), as the tied rates and the maps; before, no slope test here
     ok = np.isfinite(dh) & (fa > rl["farm_fraction_min"]) & flat & (np.abs(dh) < 1) & np.isfinite(dt) & (dt > 4); P, MIN = ok & peat, ok & ~near
     CAP = {"Feb 2015": t1 < 2016, "Dec 2017 - Mar 2018": t1 > 2017.5}
-    SITES = {"northern Torehape": (P & body["Torehape"], "Feb 2015"), "southern Torehape": (P & body["Torehape"], "Dec 2017 - Mar 2018"),
-             "drained margins of Kopuatai": (P & body["Kopuatai"], "Dec 2017 - Mar 2018")}
+    CAP["Feb 2015 - Mar 2018"] = CAP["Feb 2015"] | CAP["Dec 2017 - Mar 2018"]
+    SITES = {"Torehape": (P & body["Torehape"], "Feb 2015 - Mar 2018")}   # v110: one site, all flights pooled (each cell still referenced to its own flight); was northern/southern Torehape and the drained margins of Kopuatai
     # flights of the earlier survey (capture dates): each has its own height offset, so each site cell is referenced to mineral-soil farmland of its own flight
     # (v96; the 2017-18 campaign pooled the December 2017 and March 2018 flights, whose mineral-soil farmland differs by 3.3 mm/yr)
     FL = {"Feb 2015": t1 < 2016, "Dec 2017": (t1 > 2017.5) & (t1 < rl["flight_split_yr"]), "Mar 2018": t1 >= rl["flight_split_yr"]}
@@ -119,7 +119,7 @@ def repeat_lidar(cfg):
         with rasterio.open(f"{work}/repeat/sites_30m.tif", "w", driver="GTiff", height=sh[0], width=sh[1], count=1, dtype="uint8", crs="EPSG:2193", transform=tf, nodata=0, compress="deflate") as d_: d_.write(code, 1)
         lr = read(f"{cfg['paths']['work']}/grid30/lidcop_rel.tif")[0]
         for i, nm in enumerate(SITES, 1): R["same campaign"][nm]["LiDAR - Copernicus median"] = round(float(np.nanmedian(lr[code == i])), 1)
-    R["mineral-soil farmland, untied"] = {cp: round(float(np.median(rate[MIN & c])), 1) for cp, c in CAP.items()}
+    R["mineral-soil farmland, untied"] = {cp: round(float(np.median(rate[MIN & c])), 1) for cp, c in CAP.items() if cp != "Feb 2015 - Mar 2018"}
     R["mineral-soil farmland, untied, by flight"] = {f: round(v, 1) for f, v in REFR.items()}
     # v97: capture dates of each flight (farmland cells used; 1st-99th percentile), cells between flights, and farmland cells without a date
     def _d(y): return str((np.datetime64("1970-01-01T00:00:00", "s") + np.timedelta64(int((float(y) - 1970) * 365.2425 * 86400 + 13 * 3600), "s")).astype("datetime64[D]"))   # inverse of lib/repeat.py decimal year; NZ daylight time (UTC+13)

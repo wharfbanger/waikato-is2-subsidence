@@ -82,7 +82,7 @@ def run(cfg):
     sites = {}
     if os.path.exists(f"{work}/repeat/sites_30m.tif"):
         sc_ = read(f"{work}/repeat/sites_30m.tif")[0]
-        for i, nm in enumerate(("northern Torehape", "southern Torehape", "drained margins of Kopuatai"), 1): sites[nm] = round(float(np.nanmedian(relv[sc_ == i])), 1)
+        for i, nm in enumerate(("Torehape",), 1): sites[nm] = round(float(np.nanmedian(relv[sc_ == i])), 1)
     R = {"LiCSBAS network": cnt, "Organic-Soil farmland 95% CI (10 km block bootstrap)": org_ci, "repeat LiDAR sites (median of 30 m farmland cells)": sites, "step 15": log.strip(), "classes (median of 30 m farmland cells)": {k: round(float(np.nanmedian(relv[m])), 1) for k, m in C30.items()},
          "classes (240 m map at segment locations)": {k: samp(M, d, 240.0) for k, d in CL.items()},
          "classes (240 m map and 30 m cells, paired: cells with a 240 m value)": {k: {"30 m": round(float(np.nanmedian(relv[m & np.isfinite(M30)])), 1), "240 m": round(float(np.nanmedian(M30[m & np.isfinite(relv)])), 1), "share of cells": round(float((m & np.isfinite(M30) & np.isfinite(relv)).sum() / (m & np.isfinite(relv)).sum()), 3)} for k, m in C30.items()},   # v97: paired (v96 dropped cells of blocks below the fill rule from the 240 m side only)
