@@ -2,7 +2,8 @@
 (a) LiDAR - Copernicus: LiDAR minus the NZVD2016 Copernicus DEM (no survey-offset correction: offsets cancel in the local reference),
     divided by the interval; the 2024 pair where it exists, else the 2021 pair; each farmland cell referenced locally; 240 m map;
     Organic-Soil farmland value (median of farmland cells, farmland reference) with a 10 km block-bootstrap CI; grassland-only as a sensitivity.
-Outputs: data/work/grid30/lidcop_rate.tif, lidcop_rel.tif; outputs/maps/lidcop_rel_240m.tif; outputs/tables/lidcop.json."""
+Outputs: data/work/grid30/lidcop_rate.tif, lidcop_rel.tif; outputs/maps/lidcop_rel_240m.tif; outputs/tables/lidcop.json.
+Repeat LiDAR (v115): same-flight rates only (outputs/tables/repeat_lidar.json); the tie and the referenced map were removed."""
 import json, os, numpy as np, rasterio
 from lib.maps import read, rel, ref_adapt, blocks240, block_id, block_boot, bias_grid
 
@@ -60,6 +61,8 @@ def run(cfg):
         if o == 0.0:
             write(f"{W}/lidcop_rate.tif", C, tf); relf, _ = rel(C, FARM, NONPF, cfg); write(f"{W}/lidcop_rel.tif", relf, tf)
             M = blocks240(relf, cfg); write(f"{out}/maps/lidcop_rel_240m.tif", M, tf, 240.0)
+            mv = relf[NONPF & np.isfinite(relf)]   # v116 (Table 4 note): the reference is a local mean, class values are medians, so mineral-soil farmland need not read zero
+            R["mineral-soil farmland, referenced 30 m cells"] = dict(median=round(float(np.median(mv)), 1), mean=round(float(np.mean(mv)), 1), cells=int(mv.size))
     # Organic-Soil farmland by land cover (farmland reference): grassland >= 90% and cropland >= 50% of the 30 m cell
     from rasterio.warp import reproject, Resampling
     C, _, tf = lidar_copernicus(cfg); ref = ref_adapt(C, NONPF, cfg); ok = np.isfinite(C) & (np.abs(C) < cap) & np.isfinite(ref) & org
@@ -134,40 +137,7 @@ def repeat_lidar(cfg):
     def nsq(m):
         u, c = np.unique(sq[m], return_counts=True); c = np.sort(c)[::-1]; return dict(squares=int(u.size), share_of_two_largest=round(float(c[:2].sum() / c.sum()), 2))
     R["10 km squares"] = {nm: nsq(m & CAP[cp]) for nm, (m, cp) in SITES.items()}
-    # (3) tie to ICESat-2 on a square grid; class rates are medians over 16 grid placements
-    TIE = json.load(open(f"{out}/tables/icesat2_rates.json"))["absolute"]["mineral-soil farmland"]["rate"]
-    npk = (fa > rl["farm_fraction_min"]) & ~near & np.isfinite(rate)
-    YY, XX = np.mgrid[0:sh[0], 0:sh[1]]; X = tf.c + (XX + .5) * RS; Y = tf.f - (YY + .5) * RS
-    def tie(G, x0, y0):
-        bid = ((X - x0) // G).astype(np.int64) * 100000 + ((Y - y0) // G).astype(np.int64); adj = np.full(sh, np.nan); n = 0
-        for b in np.unique(bid[npk]):
-            m = (bid == b) & npk
-            if m.sum() >= rl["tie_min_cells"]: adj[bid == b] = np.median(rate[m]) - TIE; n += 1
-        adj[~np.isfinite(adj)] = np.median(rate[npk]) - TIE; return rate - adj, n
-    S = pd.read_parquet(f"{work}/segments_classified.parquet").drop_duplicates(subset=["X", "Y"]); a = cfg["study_area"]
-    F = S[S.land == "farmland"]; MINs = F[(F.order != "Organic") & (F.order != "not mapped") & ~F.near_peat]; hx0, hy0, hx1, hy1 = a["hauraki_box"]
-    CL = {"Organic-Soil farmland": F[F.order == "Organic"], "mineral-soil farmland": MINs, "Hauraki Plains mineral-soil farmland": MINs[MINs.X.between(hx0, hx1) & MINs.Y.between(hy0, hy1)]}
-    def samp(t, d):
-        r_ = ((tf.f - d.Y.values) // RS).astype(int); c_ = ((d.X.values - tf.c) // RS).astype(int); ok_ = (r_ >= 0) & (r_ < sh[0]) & (c_ >= 0) & (c_ < sh[1])
-        v = np.full(len(d), np.nan); v[ok_] = t[r_[ok_], c_[ok_]]; v = v[np.isfinite(v)]; return round(float(np.median(v)), 1), int(v.size)
-    ox, oy = cfg["grids"]["square_origin"]; t5, nsq = tie(cfg["grids"]["tie_square_m"], ox, oy)
-    R["tie"] = dict(ICESat2_mineral_rate=TIE, squares_with_own_offset=nsq, default_placement={k: dict(zip(("median", "points"), samp(t5, d))) for k, d in CL.items()}, spread={})
-    for G in (5000, 10000):
-        v = {k: [] for k in CL}
-        for dx in np.arange(0, G, G / 4):
-            for dy in np.arange(0, G, G / 4):
-                t, _ = tie(G, ox + dx, oy + dy)
-                for k, d in CL.items(): v[k].append(samp(t, d)[0])
-        R["tie"]["spread"][f"{G // 1000} km"] = {k: dict(min=min(x), median=float(np.median(x)), max=max(x)) for k, x in v.items()}
-    # tied class rates = median over the 16 placements of the 5 km grid (the default placement alone lies near the fast end of the spread)
-    R["tie"]["classes"] = {k: dict(median=round(v["median"], 1), points=R["tie"]["default_placement"][k]["points"]) for k, v in R["tie"]["spread"][f"{cfg['grids']['tie_square_m'] // 1000} km"].items()}
-    write(f"{work}/repeat/repeat_tied_{RS}m.tif", t5.astype(np.float32), tf, float(RS))
-    # (2) map: rates on the 30 m grid (nearest; identical when cell_m is 30), each farmland cell referenced locally, 240 m grid (Figure 3b)
-    from lib.maps import rel, blocks240
-    W = f"{work}/grid30"; cop, tf30 = read(f"{W}/cop30_nzvd2016.tif"); r30 = np.full(cop.shape, np.nan, np.float32)
-    reproject(rate.astype(np.float32), r30, src_transform=tf, src_crs="EPSG:2193", dst_transform=tf30, dst_crs="EPSG:2193", resampling=Resampling.nearest, src_nodata=np.nan, dst_nodata=np.nan)
-    FARM = (read(f"{W}/farmfrac.tif")[0] >= cfg["masks"]["farmland_fraction_min"]) & (read(f"{W}/slope_deg.tif")[0] < cfg["masks"]["slope_max_deg"]); nr = read(f"{W}/near_organic.tif")[0].astype(bool)
-    rr_, _ = rel(r30, FARM, FARM & ~nr, cfg); write(f"{W}/repeat_rel.tif", rr_, tf30); write(f"{out}/maps/repeat_rel_240m.tif", blocks240(rr_, cfg), tf30, 240.0)
+    # v115: the tie (5 km squares) and the referenced map (Figure 3b) removed (user decision, 23 Nov 2026); repeat LiDAR is same-flight only
     json.dump(R, open(f"{out}/tables/repeat_lidar.json", "w"), indent=1); print(json.dumps(R, indent=1), flush=True)
 
 

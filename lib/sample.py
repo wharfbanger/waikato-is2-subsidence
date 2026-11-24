@@ -1,6 +1,6 @@
 """Sampling helpers: LINZ LiDAR DEM heights and slopes at points (read from the public nz-elevation bucket), and WorldCover class with
 the 3 x 3 'pure window' flag."""
-import concurrent.futures as cf, numpy as np, pyproj, rasterio
+import time, concurrent.futures as cf, numpy as np, pyproj, rasterio
 from rasterio.windows import from_bounds
 from scipy.ndimage import map_coordinates, minimum_filter
 
@@ -17,23 +17,28 @@ def lidar_at(X, Y, tiles, base, factor=4, workers=12):
 
     def work(job):
         name, idx = job
+        err = None
         for k in range(4):
             try:
                 with rasterio.Env(GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR", GDAL_HTTP_MAX_RETRY="5", GDAL_HTTP_RETRY_DELAY="2"), rasterio.open("/vsicurl/" + base + name) as d:
                     a = d.read(1, out_shape=(d.height // factor, d.width // factor)).astype(float); nod = d.nodata
                     tf = d.transform * d.transform.scale(d.width / a.shape[1], d.height / a.shape[0])
                 break
-            except Exception:
-                if k == 3: return idx, None, None
+            except Exception as e:
+                err = e; time.sleep(2 * (k + 1))
+                if k == 3: return idx, None, f"{name}: {e}"
         if nod is not None: a[a == nod] = np.nan
         c = (X[idx] - tf.c) / tf.a - .5; r = (Y[idx] - tf.f) / tf.e - .5
         v = map_coordinates(np.nan_to_num(a, nan=-9e9), [r, c], order=1, mode="constant", cval=-9e9); v[v < -1e8] = np.nan
         gy, gx = np.gradient(a); sl = np.degrees(np.arctan(np.hypot(gx, gy) / tf.a))
         return idx, v, map_coordinates(np.nan_to_num(sl, nan=90), [r, c], order=0, mode="nearest")
     with cf.ThreadPoolExecutor(workers) as ex:
+        failed = []
         for idx, v, s in ex.map(work, jobs):
-            if v is None: continue
+            if v is None: failed.append(s); continue
             ok = np.isfinite(v) & np.isnan(out[idx]); out[idx[ok]] = v[ok]; slope[idx[ok]] = s[ok]
+    if failed:   # v113: a tile that cannot be read stops the run (was skipped silently: a fresh run once lost the whole 2024 survey to a network outage)
+        raise RuntimeError(f"{len(failed)} of {len(jobs)} LiDAR tiles could not be read (network?); rerun the step. First: {failed[0]}")
     return out, slope
 
 

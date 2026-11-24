@@ -46,6 +46,28 @@ def fit(pp, min_passes=8, n_boot=2000, seed=0, seasonal=True):
     return out
 
 
+def step_fit(pp, t_break, n_boot=2000, seed=7):
+    """v114 (Section 4.4): one fit with one constant per DEM, annual sinusoid, a trend before t_break, a change of trend after it and a
+    step (offset) at t_break. Rates before and after (mm/yr) and the step (mm), with formula SE and a bootstrap of whole passes (95% CI)."""
+    if pp["pass"].nunique() < 12 or (pp.t < t_break).sum() < 6 or (pp.t >= t_break).sum() < 6: return None
+    A, k = design(pp, t_break=t_break); y = pp["r"].values
+    def est(A_, y_):
+        b = np.linalg.lstsq(A_, y_, rcond=None)[0]; return np.array([b[k], b[k] + b[-2], b[-1]]) * 1000
+    b = np.linalg.lstsq(A, y, rcond=None)[0]; e = y - A @ b; C = (e @ e) / (len(y) - A.shape[1]) * np.linalg.pinv(A.T @ A)
+    L = np.zeros((3, A.shape[1])); L[0, k] = 1; L[1, k] = 1; L[1, -2] = 1; L[2, -1] = 1; se = np.sqrt(np.diag(L @ C @ L.T)) * 1000
+    v = est(A, y); out = dict(zip(("before", "after", "step_mm"), [dict(value=round(float(x), 1), se=round(float(s), 2)) for x, s in zip(v, se)]))
+    out["passes"] = int(pp["pass"].nunique())
+    if n_boot:
+        passes = pp["pass"].unique(); rng = np.random.default_rng(seed); grp = {p: np.flatnonzero(pp["pass"].values == p) for p in passes}; bs = []
+        for _ in range(n_boot):
+            i = np.concatenate([grp[p] for p in rng.choice(passes, len(passes))]); q = pp.iloc[i]
+            Ai, _ = design(q, t_break=t_break)
+            if Ai.shape[1] == A.shape[1] and (q.t < t_break).sum() > 5 and (q.t >= t_break).sum() > 5: bs.append(est(Ai, y[i]))
+        bs = np.array(bs)
+        for j, nm in enumerate(("before", "after", "step_mm")): out[nm]["ci"] = [round(float(np.percentile(bs[:, j], 2.5)), 1), round(float(np.percentile(bs[:, j], 97.5)), 1)]
+    return out
+
+
 def diff_series(target, ref, min_seg):
     """Per-pass target minus reference on the same pass and DEM."""
     j = per_pass(target, min_seg).merge(per_pass(ref, min_seg), on=["pass", "col"], suffixes=("", "_ref"))

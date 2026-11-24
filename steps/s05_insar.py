@@ -1,22 +1,32 @@
 """Step 5 (Table S1): InSAR vertical velocity.
-(a) LiCSBAS in WSL: steps 01-13 (batch_LiCSBAS.sh) unless a time series already exists in the job folder; no noise mask (step 15) by default,
-    for ease of reproduction (insar.mask: true applies step 15 with the config thresholds in a copy of the time series); step 16 not used;
+(a) LiCSBAS outputs (velocity, up component, step-15 mask, grid, log) from data/raw/insar/ when present (archived on Zenodo; no LiCSBAS needed);
+    otherwise LiCSBAS steps 01-13 (batch_LiCSBAS.sh, unless a time series already exists in the job folder) and step 15, run with bash
+    (in WSL on Windows), and the outputs saved to data/raw/insar/. No noise mask by default, for ease of reproduction (insar.mask: true applies
+    the step-15 mask); step 16 not used; set insar.force_licsbas: true to rerun LiCSBAS when the archived outputs are present;
 (b) vertical = line-of-sight velocity / up component of the unit vector; masked; averaged to the 30 m grid;
 (c) each farmland cell referenced locally (as step 4); 240 m map; class values at the ICESat-2 segment locations; InSAR zones.
 Outputs: data/work/insar/vel_up.tif, grid30/insar_rel.tif, outputs/maps/insar_rel_240m.tif, outputs/tables/insar.json."""
-import json, os, subprocess, numpy as np, pandas as pd, rasterio
+import json, os, shutil, subprocess, numpy as np, pandas as pd, rasterio
 from rasterio.transform import from_origin
 from rasterio.warp import reproject, Resampling
 from lib.maps import read, rel, blocks240
 from steps.s04_dem_rates import write
 
 
-def wsl_path(p): p = os.path.abspath(p).replace("\\", "/"); return f"/mnt/{p[0].lower()}{p[2:]}"
+def wsl_path(p):
+    p = os.path.abspath(p).replace("\\", "/"); return f"/mnt/{p[0].lower()}{p[2:]}" if os.name == "nt" else p   # bash path (WSL on Windows)
+
+
+ARCHIVE = ("vel", "U.geo", "mask", "EQA.dem_par", "licsbas_log.txt")   # LiCSBAS outputs read by this step (Zenodo deposit)
 
 
 def licsbas(cfg, D):
-    """Writes and runs a WSL script; returns the folder holding results/ of the pipeline's step-15 run."""
-    i = cfg["insar"]; s15 = i["step15"]; T = f"{i['wsl_pipeline_dir']}/TS"
+    """LiCSBAS outputs into D; returns the LiCSBAS log (step-15 summary, network counts). Archived outputs when present, else runs LiCSBAS."""
+    i = cfg["insar"]; A = f"{cfg['paths']['raw']}/insar"
+    if all(os.path.exists(f"{A}/{f}") for f in ARCHIVE) and not i.get("force_licsbas"):
+        for f in ARCHIVE[:4]: shutil.copy2(f"{A}/{f}", D)
+        print(f"LiCSBAS outputs from {A} (archived; insar.force_licsbas: true reruns LiCSBAS)", flush=True); return open(f"{A}/licsbas_log.txt", encoding="utf-8").read()
+    s15 = i["step15"]; T = f"{i['wsl_pipeline_dir']}/TS"
     step15 = f"""mkdir -p {T}; [ -f {T}/cum.h5 ] || cp $J/TS_GEOCml1clip/cum.h5 {T}/
 rm -rf {T}/results {T}/info {T}/network; cp -r $J/TS_GEOCml1clip/results $J/TS_GEOCml1clip/info $J/TS_GEOCml1clip/network {T}/
 cd {i['wsl_pipeline_dir']}
@@ -39,9 +49,10 @@ echo "interferograms_input $(grep -c '^2' $J/TS_GEOCml1clip/info/11ifg_stats.txt
 cp $J/TS_GEOCml1clip/results/vel {wsl_path(D)}/; cp $J/GEOCml1clip/U.geo $J/GEOCml1clip/EQA.dem_par {wsl_path(D)}/
 """
     p = f"{D}/run_licsbas.sh"; open(p, "w", newline="\n").write(sh)
-    r = subprocess.run(["wsl.exe", "bash", wsl_path(p)], capture_output=True, text=True); print(r.stdout, r.stderr[-2000:], flush=True)
+    r = subprocess.run((["wsl.exe"] if os.name == "nt" else []) + ["bash", wsl_path(p)], capture_output=True, text=True); print(r.stdout, r.stderr[-2000:], flush=True)
     if r.returncode: raise RuntimeError("LiCSBAS failed")
-    return r.stdout
+    os.makedirs(A, exist_ok=True); [shutil.copy2(f"{D}/{f}", A) for f in ARCHIVE[:4]]
+    open(f"{A}/licsbas_log.txt", "w", encoding="utf-8", newline=chr(10)).write(r.stdout); return r.stdout
 
 
 def run(cfg):
@@ -88,6 +99,8 @@ def run(cfg):
          "classes (240 m map and 30 m cells, paired: cells with a 240 m value)": {k: {"30 m": round(float(np.nanmedian(relv[m & np.isfinite(M30)])), 1), "240 m": round(float(np.nanmedian(M30[m & np.isfinite(relv)])), 1), "share of cells": round(float((m & np.isfinite(M30) & np.isfinite(relv)).sum() / (m & np.isfinite(relv)).sum()), 3)} for k, m in C30.items()},   # v97: paired (v96 dropped cells of blocks below the fill rule from the 240 m side only)
          "classes (240 m cells, most of their valid 30 m cells in the class)": {k: round(float(np.nanmedian(M[maj(m)])), 1) for k, m in C30.items()},
          "zones_km2": {t: round(float((M <= t).sum() * 0.0576), 1) for t in cfg["insar"]["zones_mm_yr"]}}
+    mv = relv[FARM & ~near & np.isfinite(relv)]   # v116 (Table 4 note): local-mean reference, median class values
+    R["mineral-soil farmland, referenced 30 m cells"] = dict(median=round(float(np.median(mv)), 1), mean=round(float(np.mean(mv)), 1), cells=int(mv.size))
     import geopandas as gpd
     from rasterio.features import geometry_mask
     from lib.maps import ref_adapt

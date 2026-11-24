@@ -3,13 +3,13 @@ Input: data/work/segments.parquet (step 2). Outputs: data/work/segments_classifi
 data/work/bias2021_10km.csv.
 v108: Kopuatai bog, segmented fit, seasonal amplitude and the Figure 6b-d series removed (paper v108)."""
 import json, os, numpy as np, pandas as pd, geopandas as gpd
-from lib.is2 import per_pass, fit, diff_series, separate_difference
+from lib.is2 import per_pass, fit, diff_series, separate_difference, step_fit
 
 FARM, BUILT, WET = (30, 40), 50, 90
 
 
 def classify(cfg):
-    """Residual against the 2024 LiDAR where it has a height, else the 2021 LiDAR; then the slope test on that DEM (as is2rate and Table S1); screening; land and soil labels.
+    """Residual against the 2024 LiDAR where it has a height, else the 2021 LiDAR; then the slope test on that DEM (Table S1); screening; land and soil labels.
     v99: before, a segment steep (>= 2 deg) in the 2024 LiDAR fell back to the 2021 LiDAR (drains/earthworks dug after 2021 compared with the earlier surface)."""
     raw, work = cfg["paths"]["raw"], cfg["paths"]["work"]; a = cfg["study_area"]; q = cfg["icesat2"]["screening"]
     df = pd.read_parquet(f"{work}/segments.parquet")
@@ -17,7 +17,7 @@ def classify(cfg):
     df["L"] = np.where(u24, df.L2024, df.L2021); df["S"] = np.where(u24, df.S2024, df.S2021); df["col"] = np.where(u24, "2024", "2021")
     df = df[df.L.notna() & (df.S < q["terrain_slope_max_deg"]) & df.X.between(a["xmin"], a["xmax"], inclusive="left") & df.Y.between(a["ymin"], a["ymax"], inclusive="left")].copy()
     df["r"] = df.H - df.L
-    df = df[(df.r - df.groupby(["pass", "col"]).r.transform("median")).abs() <= q["residual_max_m"]].copy()   # v99+: within 0.5 m of the median of its pass and DEM (all land), as is2rate; was the record-wide farmland median
+    df = df[(df.r - df.groupby(["pass", "col"]).r.transform("median")).abs() <= q["residual_max_m"]].copy()   # v99+: within 0.5 m of the median of its pass and DEM (all land); was the record-wide farmland median
     farm = df.wc_solid & df.wc.isin(FARM); built = df.wc_solid & (df.wc == BUILT); wet = df.wc == WET
     df = df[farm | built | wet].copy(); df["land"] = np.select([df.wc == WET, df.wc == BUILT], ["natural wetland", "built-up"], "farmland")
     sm = gpd.read_file(f"{raw}/soils/smap_soilorder_waikato.gpkg")[["NZSCOrder", "geometry"]]
@@ -65,6 +65,14 @@ def run(cfg):
     for k, v in S.items():
         jk = [separate_difference(v[v["pass"] != q], rc["break_date"], n_boot=0)["before_minus_after"] for q in v["pass"].unique()]
         R["separate fits, before minus after"][k]["leave_one_pass_out"] = [round(-max(jk), 1), round(-min(jk), 1)]   # as after - before
+    # v114 (review A1): two trends and a step at the break in one fit (reversible rise vs lasting rate), and the break moved by -/+ 6 months
+    R["two trends and a step at the break"] = {k: step_fit(v, rc["break_date"], n_boot=nb) for k, v in S.items()}
+    R["break date sensitivity (separate fits)"] = {k: {str(tb): dict(before=fit(v[v.t < tb], n_boot=0), after=fit(v[v.t >= tb], n_boot=0), **separate_difference(v, tb, n_boot=nb))
+                                                      for tb in rc["break_date_sensitivity"]} for k, v in S.items()}
+    # v114 (review A7): ICESat-2 on the Organic-Soil farmland of the Torehape body (the repeat LiDAR site), whole record and periods
+    TH = diff_series(ORG[ORG.body == "Torehape"], MIN, ms)
+    R["Torehape Organic-Soil farmland"] = {"2018-2026": fit(TH, n_boot=nb), "Oct 2018 - Jun 2022": fit(TH[TH.t < u1], n_boot=nb), "Jul 2022 - Oct 2026": fit(TH[TH.t >= v0], n_boot=nb),
+                                           "segments": int((ORG.body == "Torehape").sum())}
     R["Organic-Soil farmland without annual cycle"] = fit(S["Organic-Soil farmland"], n_boot=0, seasonal=False)
     rat = {o: fit(diff_series(F[F.order == o], MIN, ms), n_boot=nb) for o in F.order.unique() if o != "not mapped" and (F.order == o).sum() >= 300}
     rr = {k: round(v["se"] / v["boot_se"], 2) for k, v in rat.items() if v}

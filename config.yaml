@@ -44,7 +44,6 @@ grids:
   hex_origin: [1750880.6, 5786524.8]
   square_origin: [1750000, 5785000]
   bias_square_m: 10000
-  tie_square_m: 5000
 
 icesat2:
   sliderule:            # atl06p request
@@ -75,6 +74,7 @@ icesat2:
     min_passes: 8
     periods: [[2018.78, 2026.80], [2018.78, 2022.5], [2022.5, 2026.80]]
     break_date: 2022.5
+    break_date_sensitivity: [2022.0, 2023.0]   # break moved by -/+ 6 months (review A1)
     n_boot: 2000
     n_boot_change: 20000   # CI of the change of rate between the periods (Section 4.4)
   survey_bias:
@@ -92,7 +92,6 @@ maps:
 
 repeat_lidar:
   cell_m: 30             # the 30 m grid of the other maps (96 m in v92: rates within 1 mm/yr)
-  tie_min_cells: 50
   farm_fraction_min: 0.9
   laz_earlier: NZ15_Huntly
   laz_later: NZ24_Waikato
@@ -106,6 +105,7 @@ insar:
   clip: [174.716, 175.940, -38.237, -37.094]
   step11: {unw_thre: 0.3, coh_thre: 0.05}
   step12: {loop_thre: 1.5, multi_prime: true}
+  force_licsbas: false   # true reruns LiCSBAS even when data/raw/insar holds the archived outputs
   mask: false            # no LiCSBAS step-15 noise mask (paper choice, for reproducibility); true applies step15 below
   step15: {coh_thre: 0.05, n_unw_r_thre: 1.195, vstd_thre: 2, maxTlen_thre: 1, n_gap_thre: 30, stc_thre: 5, n_ifg_noloop_thre: 50, n_loop_err_thre: 100, resid_rms_thre: 10}   # Harvey et al. (2026) Figure S1; n_unw_r 1.195 x 118 images = 141 (the 14 Jan 2025 new_params map)
   wsl_job_dir: ~/LiCSBAS_jobs/073D_12785_121717_2018_22   # LiCSBAS job folder in WSL
@@ -117,6 +117,7 @@ insar:
   cambridge_centre: [175.47, -37.89]   # town centre (lon, lat)
 
 hexagons:
+  insar_period_end: "2022-06-30"   # v114: hexagons over the InSAR period for the map comparison (review B)
   min_cells: 30
   min_farm_share: 0.25
   reference_km: 10
@@ -135,12 +136,6 @@ weather:
   soil_layer: soil_moisture_28_to_100cm
   smooth_days: 30
   anomaly_base: [2017, 2026]
-
-is2rate:                 # github.com/wharfbanger/is2rate v0.3.0 (local clone)
-  script: ../is2rate/is2rate.py   # clone of github.com/wharfbanger/is2rate
-  bbox: [174.689, -38.071, 175.804, -37.140]
-  start: 2018-10-13
-  end: 2026-10-20
 
 south_island:            # Harvey et al. (2026) study areas; DEMs in order of precedence; reference towns (lon0, lat0, lon1, lat1)
   Southland:

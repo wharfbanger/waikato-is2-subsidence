@@ -75,24 +75,8 @@ def masks(cfg, W):
     print("masks written", flush=True)
 
 
-def build_vrt(cfg, col, out):
-    """Mosaic of the 1 m tiles of one collection (read by is2rate, step 6)."""
-    fs = download_tiles(cfg, col); bs = []
-    for f in fs:
-        with rasterio.open(f) as d: bs.append((d.bounds, d.nodata if d.nodata is not None else -9999))
-    xmin = min(b.left for b, _ in bs); xmax = max(b.right for b, _ in bs); ymin = min(b.bottom for b, _ in bs); ymax = max(b.top for b, _ in bs)
-    s = [f'<VRTDataset rasterXSize="{int(xmax - xmin)}" rasterYSize="{int(ymax - ymin)}">', '<SRS dataAxisToSRSAxisMapping="1,2">EPSG:2193</SRS>',
-         f'<GeoTransform>{xmin}, 1.0, 0.0, {ymax}, 0.0, -1.0</GeoTransform>', '<VRTRasterBand dataType="Float32" band="1"><NoDataValue>-9999</NoDataValue>']
-    for f, (b, nd) in zip(fs, bs):
-        s.append(f'<ComplexSource><SourceFilename relativeToVRT="0">{os.path.abspath(f)}</SourceFilename><SourceBand>1</SourceBand>'
-                 f'<SrcRect xOff="0" yOff="0" xSize="{int(b.right - b.left)}" ySize="{int(b.top - b.bottom)}"/>'
-                 f'<DstRect xOff="{int(b.left - xmin)}" yOff="{int(ymax - b.top)}" xSize="{int(b.right - b.left)}" ySize="{int(b.top - b.bottom)}"/><NODATA>{nd}</NODATA></ComplexSource>')
-    s.append("</VRTRasterBand></VRTDataset>"); open(out, "w").write(chr(10).join(s))
-
-
 def run(cfg):
-    W = f"{cfg['paths']['work']}/grid30"; os.makedirs(W, exist_ok=True); V = f"{cfg['paths']['work']}/vrt"; os.makedirs(V, exist_ok=True)
-    for col in cfg["lidar"]["waikato"]: build_vrt(cfg, col, f"{V}/{col}.vrt")
+    W = f"{cfg['paths']['work']}/grid30"; os.makedirs(W, exist_ok=True)   # v120: the 1 m VRT mosaics (read only by is2rate) are no longer built
     for col in cfg["lidar"]["waikato"]:
         if not os.path.exists(f"{W}/dem30_{col}.tif"): dem30(cfg, col, f"{W}/dem30_{col}.tif")
     if not os.path.exists(f"{W}/cop30_nzvd2016.tif"): copernicus(cfg, f"{W}/cop30_nzvd2016.tif")

@@ -4,7 +4,8 @@ Place under `data/raw/` (paths in `config.yaml`):
 
 | Folder / file | Source |
 |---|---|
-| `icesat2/<Area>_??_atl06sr.parquet` | SlideRule ATL06-SR (step 2 and step 8 download them if missing) |
+| `icesat2/<Area>_??_atl06sr.parquet` | SlideRule ATL06-SR; the paper's files are on Zenodo (10.5281/zenodo.24385729); step 2 and step 8 download any that are missing |
+| `insar/vel`, `U.geo`, `mask`, `EQA.dem_par`, `licsbas_log.txt` | LiCSBAS outputs of frame 073D_12785_121717, 2018–2022 (Zenodo zip above); step 5 runs LiCSBAS on the COMET LiCSAR interferograms and writes them if missing |
 | `boundaries/Nth_Waikato.shp`, `Southland.shp`, `Canterbury.shp` | Study areas of Harvey and Rissmann (2026) and Harvey et al. (2026) |
 | `soils/smap_organic_waikato.shp`, `smap_soilorder_waikato.gpkg` | S-map soil order (Manaaki Whenua – Landcare Research, August 2024) |
 | `soils/Waikato_peat_bodies_stats.gpkg` | Organic Soil bodies (Kopuatai, Torehape, …) |

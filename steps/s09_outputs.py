@@ -1,7 +1,7 @@
 """Step 9 (Table S1): final outputs.
 - outputs/tables/Table3.xlsx, Table4.xlsx and paper_values.json (every number the paper quotes, keyed by name);
 - outputs/plots/*.xlsx: the data of each plot (Figure 4d hexagon scatter, Figure 5 maximum rates; Figure 6 written by steps 3 and 7);
-- outputs/maps/*.tif|gpkg: 240 m rate maps (steps 4-5), hexagons (step 6), hillshade, distance bands and InSAR zones;
+- outputs/maps/*.tif|gpkg: 240 m rate maps (steps 4-5), hexagons (step 6), hillshade, InSAR zones with their ICESat-2 rates (Figure 5a-b);
 - outputs/waikato_is2.qgz: QGIS project with these layers in the styles of the paper's figures (built with PyQGIS, qgis/make_project.py)."""
 import json, os, subprocess, numpy as np, pandas as pd, geopandas as gpd, rasterio
 from lib.maps import read
@@ -18,12 +18,12 @@ def hillshade(cfg, out):
 
 def run(cfg):
     out, work = cfg["paths"]["out"], cfg["paths"]["work"]; os.makedirs(f"{out}/plots", exist_ok=True)
-    I3, LC, RL, IN, HX, MX, WE, SI, RV, SE = (J(out, f) for f in ("icesat2_rates.json", "lidcop.json", "repeat_lidar.json", "insar.json", "hexagons.json", "max_rates.json", "weather.json", "south_island.json", "repeat_vs_insar.json", "sensitivity.json"))
-    rel, ab = I3["relative to mineral-soil farmland"], I3["absolute"]; lc = next(iter(LC.values())); tc = RL["tie"]["classes"]; ic = IN["classes (240 m map at segment locations)"]
+    I3, LC, RL, IN, HX, MX, WE, SI, SE = (J(out, f) for f in ("icesat2_rates.json", "lidcop.json", "repeat_lidar.json", "insar.json", "hexagons.json", "max_rates.json", "weather.json", "south_island.json", "sensitivity.json"))
+    rel, ab = I3["relative to mineral-soil farmland"], I3["absolute"]; lc = next(iter(LC.values())); ic = IN["classes (240 m map at segment locations)"]
     se = lambda d: f"{d['rate']:+.1f} ± {d['se']:.1f}".replace("-", "−")
-    T3 = pd.DataFrame([["Organic-Soil farmland", se(rel["Organic-Soil farmland"]), ic["Organic-Soil farmland"], lc["median_rel"], tc["Organic-Soil farmland"]["median"]],
-                       ["Mineral-soil farmland", "reference", ic["mineral-soil farmland"], "reference", tc["mineral-soil farmland"]["median"]]],
-                      columns=["Land class", "ICESat-2", "InSAR", "LiDAR − Copernicus", "Repeat LiDAR, tied"])
+    T3 = pd.DataFrame([["Organic-Soil farmland", se(rel["Organic-Soil farmland"]), ic["Organic-Soil farmland"], lc["median_rel"]],
+                       ["Mineral-soil farmland", "reference", ic["mineral-soil farmland"], "reference"]],
+                      columns=["Land class", "ICESat-2", "InSAR", "LiDAR − Copernicus"])
     rows = []
     for k, v in MX.items():
         if not isinstance(v, dict) or "km2" not in v: continue
@@ -33,15 +33,18 @@ def run(cfg):
     T4 = pd.DataFrame(rows, columns=["Subset", "Selection", "Area (km²)", "ICESat-2 Oct 2018 – Jun 2022", "ICESat-2 Jul 2022 – Oct 2026", "ICESat-2 2018–2026", "InSAR map median", "LiDAR − Copernicus median"])
     with pd.ExcelWriter(f"{out}/tables/Table3.xlsx") as xw: T3.to_excel(xw, index=False)
     with pd.ExcelWriter(f"{out}/tables/Table4.xlsx") as xw: T4.to_excel(xw, index=False)
-    V = {"icesat2": I3, "lidar_copernicus": LC, "repeat_lidar": RL, "insar": IN, "hexagons": HX, "max_rates": MX, "weather": WE, "south_island": SI, "repeat_vs_insar": RV, "sensitivity": SE}
+    V = {"icesat2": I3, "lidar_copernicus": LC, "repeat_lidar": RL, "insar": IN, "hexagons": HX, "max_rates": MX, "weather": WE, "south_island": SI, "sensitivity": SE}
     json.dump(V, open(f"{out}/tables/paper_values.json", "w"), indent=1)
     hx = gpd.read_file(f"{out}/maps/hex_3km.gpkg")
     with pd.ExcelWriter(f"{out}/plots/fig4d_hexagons.xlsx") as xw: pd.DataFrame(hx.drop(columns="geometry")).to_excel(xw, index=False)
     with pd.ExcelWriter(f"{out}/plots/fig5_max_rates.xlsx") as xw: T4.to_excel(xw, index=False)
     hillshade(cfg, out)
-    for nm in ("band", "insar_le"):   # target polygons of step 6 as one layer each
-        fs = sorted(f for f in os.listdir(f"{work}/is2rate/max/polys") if f.startswith(nm))
-        gpd.GeoDataFrame(pd.concat([gpd.read_file(f"{work}/is2rate/max/polys/{f}").assign(name=f[:-5]) for f in fs], ignore_index=True), crs=2193).to_file(f"{out}/maps/{'distance_bands' if nm == 'band' else 'insar_zones'}.gpkg")
+    # InSAR zones of step 6 (target polygons) as one layer, with the ICESat-2 rates of Table 5; distance bands were removed in v107
+    zs = [k for k in MX if k.startswith("insar_le_")]; g = lambda k, p: (MX[k].get(p) or {}).get("rate")
+    gpd.GeoDataFrame(pd.concat([gpd.read_file(f"{work}/zones/polys/{k}.gpkg").assign(name=k, threshold=-int(k.rsplit("_", 1)[1]), km2=MX[k]["km2"],
+        rate_2018_2022=g(k, "Oct 2018 - Jun 2022"), rate_2022_2026=g(k, "Jul 2022 - Oct 2026"), rate_2018_2026=g(k, "2018-2026")) for k in zs], ignore_index=True), crs=2193
+        ).to_file(f"{out}/maps/insar_zones.gpkg")
+    if os.path.exists(f"{out}/maps/distance_bands.gpkg"): os.remove(f"{out}/maps/distance_bands.gpkg")
     q = cfg.get("qgis", {})
     if q.get("python"):
         r = subprocess.run([q["python"], os.path.abspath("qgis/make_project.py"), os.path.abspath(out), os.path.abspath(f"{cfg['paths']['raw']}/soils/smap_organic_waikato.shp")], capture_output=True, text=True)
